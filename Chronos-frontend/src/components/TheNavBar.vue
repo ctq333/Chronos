@@ -33,6 +33,7 @@
 
 <script setup>
 import { ref } from "vue";
+import { Ripple } from "primevue";
 import Menubar from 'primevue/menubar';
 import Button from 'primevue/button';
 import Avatar from 'primevue/avatar';
