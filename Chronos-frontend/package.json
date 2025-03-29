@@ -9,10 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.13"
+    "@primeuix/themes": "^1.0.0",
+    "axios": "^1.8.3",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.3.2",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@primevue/auto-import-resolver": "^4.3.2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "unplugin-vue-components": "^28.4.1",
     "vite": "^6.2.0"
   }
 }
