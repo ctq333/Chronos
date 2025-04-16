@@ -1,5 +1,5 @@
 <template>
-    <div class="card">
+    <div class="card sticky" style="top: 0;z-index: 1000;">
         <Menubar :model="items">
             <template #start>
                 <svg width="35" height="40" viewBox="0 0 35 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-8">
@@ -48,28 +48,11 @@ const items = ref([
     },
     {
         label: 'Projects',
-        icon: 'pi pi-search',
-        badge: 3,
-        items: [
-            {
-                label: 'Core',
-                icon: 'pi pi-bolt',
-                shortcut: '⌘+S'
-            },
-            {
-                label: 'Blocks',
-                icon: 'pi pi-server',
-                shortcut: '⌘+B'
-            },
-            {
-                separator: true
-            },
-            {
-                label: 'UI Kit',
-                icon: 'pi pi-pencil',
-                shortcut: '⌘+U'
-            }
-        ]
+        icon: 'pi pi-search'
+    },
+    {
+        label: 'Projects',
+        icon: 'pi pi-search'
     }
 ]);
 </script>
