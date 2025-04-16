@@ -32,6 +32,9 @@ const ingredient = ref('');
     margin-left: 10vw;
     margin-right: 10vw;
     margin-top: 10vh;
-    background: #fafbfc;
+    
+    }
+    template {
+        background: #fafbfc;
     }
 </style>
