@@ -9,7 +9,7 @@ import ScheduleView from '@/views/ScheduleView.vue';
 import Tasks from '@/views/TaskView.vue';
 import WeeklyReportView from '@/views/WeeklyReportView.vue';
 import MonthlyReportView from '@/views/MonthlyReportView.vue';
-import IncomingEventManageView from '@/views/IncomingEventManageView.vue';
+import IncomingEventManagementView from '@/views/IncomingEventManagementView.vue';
 
 const routes = [
   { path: '/', component: HomeView, name: 'home'},
@@ -21,7 +21,7 @@ const routes = [
   { path: '/tasks', component: Tasks, name: 'tasks'},
   { path: '/weekreport', component: WeeklyReportView, name: 'weekreport'},
   { path: '/monthreport', component: MonthlyReportView, name: 'monthreport'},
-  { path: '/incomingevent', component: IncomingEventManageView, name: 'incomingevent'},
+  { path: '/incomingevent', component: IncomingEventManagementView, name: 'incomingevent'},
 
   
 ]
