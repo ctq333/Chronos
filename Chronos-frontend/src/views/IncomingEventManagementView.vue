@@ -33,13 +33,13 @@
             <template #body="{ data }">
                 <Button 
                 icon="pi pi-check" 
-                class="p-button-success p-button-sm mr-2" 
+                class="p-button-primary p-button-sm mr-2" 
                 @click="acceptSchedule(data.id)"
                 label="接收"
                 />
                 <Button 
                 icon="pi pi-times" 
-                class="p-button-danger p-button-sm" 
+                class="p-button-secondary p-button-sm" 
                 @click="rejectSchedule(data.id)"
                 label="拒绝"
                 />
