@@ -1,32 +1,29 @@
 <template>
-    <div class="min-h-screen bg-gradient-to-br from-white via-gray-100 to-gray-200 p-6">
-      <h1 class="text-3xl font-bold mb-6 text-gray-800">MonthlyReportView</h1>
-
-      <!-- 月报模块（毛玻璃浮层）-->
-      <div
-        class="backdrop-blur-md bg-white/30 border border-gray-200 rounded-2xl p-10 shadow-lg ring-1 ring-gray-300"
-      >
-        <h2 class="text-xl font-semibold mb-6 text-gray-700">月报</h2>
+    <div class="min-h-screen bg-gradient-to-br from-white via-gray-100 to-gray-200 p-6 flex flex-col items-center">
+      
+      <!-- 月报标题，和大框左对齐 -->
+      <div class="max-w-5xl w-full px-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">月报</h2>
+      </div>
   
-        <div class="border border-gray-300 rounded-xl p-10 flex justify-center items-center bg-white/40">
-          <button
-            class="px-6 py-3 border border-gray-600 hover:bg-gray-200 rounded-xl text-gray-800 font-medium transition"
-            @click="generateReport"
-          >
-            点此开始生成
-          </button>
-        </div>
+      <!-- 毛玻璃大框 -->
+      <div
+        class="max-w-5xl w-full px-6 py-8 rounded-lg shadow-xl backdrop-blur-lg bg-white/30 border border-black/40 flex justify-center items-center"
+        style="min-height: 75vh; margin-bottom: 5vh;"
+      >
+        <button
+          class="px-6 py-3 border border-gray-700 rounded-lg bg-white/60 hover:bg-white text-gray-800 font-semibold text-lg shadow transition"
+          @click="generateReport"
+        >
+          点此开始生成
+        </button>
       </div>
     </div>
   </template>
   
   <script setup>
   function generateReport() {
-    alert("月报生成中...");
+    alert("开始生成月报...");
   }
   </script>
-  
-  <style scoped>
-  /* 可继续添加动画或响应式样式 */
-  </style>
   
