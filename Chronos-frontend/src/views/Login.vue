@@ -1,7 +1,7 @@
 <template>
     <div id="container">
         <form id="loginForm" action="">
-            <h2>登陆您的账号</h2>
+            <h2>登录您的账号</h2>
             <div class="input">
                 <input type="text" placeholder="User Name or E-mail" id="account" v-model="account">
             </div>
@@ -12,7 +12,7 @@
                 <span><router-link to="/signup">注册账号</router-link></span>
             </div>
             <div id="loginButton">
-                <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">登陆</button>
+                <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">登录</button>
             </div>
         </form>
     </div>
