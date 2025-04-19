@@ -12,7 +12,7 @@
                 <span><router-link to="/signup">注册账号</router-link></span>
             </div>
             <div id="loginButton">
-                <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">登陆</button>
+                <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">登录</button>
             </div>
         </form>
     </div>
