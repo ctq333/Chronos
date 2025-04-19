@@ -9,7 +9,7 @@
                 <input type="password" placeholder="Password" id="userPassword" v-model="password">
             </div>
             <div id="action">
-                <span><router-link to="/login">返回登陆</router-link></span>
+                <span><router-link to="/login">返回登录</router-link></span>
             </div>
             <div id="loginButton">
                 <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">注册</button>

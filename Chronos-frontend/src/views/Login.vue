@@ -1,7 +1,7 @@
 <template>
     <div id="container">
         <form id="loginForm" action="">
-            <h2>登陆您的账号</h2>
+            <h2>登录您的账号</h2>
             <div class="input">
                 <input type="text" placeholder="User Name or E-mail" id="account" v-model="account">
             </div>
