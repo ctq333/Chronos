@@ -24,7 +24,7 @@
 							<span class="text-sm text-gray-500">
 								剩余时间：{{ getRemainingDays(event.dueDate) }}
 							</span>
-							<Knob class="text-sm text-gray-500" size="50" v-model="event.progress" />
+							<Knob class="text-sm text-gray-500" size="70" v-model="event.progress" />
 						</div>
 					</template>
 					<template #content>
@@ -84,8 +84,6 @@
 <script setup>
 
 	import { ref, computed, onMounted } from 'vue';
-	import Splitter from 'primevue/splitter';
-	import SplitterPanel from 'primevue/splitterpanel';
 	import Button from 'primevue/button';
 	import SelectButton from 'primevue/selectbutton';
 	import Dialog from 'primevue/dialog';
@@ -93,11 +91,10 @@
 	import Calendar from 'primevue/calendar';
 	import Textarea from 'primevue/textarea';
 	import Card from 'primevue/card';
-	import Timeline from 'primevue/timeline';
 	import Knob from 'primevue/knob';
 	import Tag from 'primevue/tag';
 	import Checkbox from 'primevue/checkbox';
-	
+
 	function getPriorityText(priority) {
 		const texts = {
 			1: '低',
