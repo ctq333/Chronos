@@ -7,7 +7,7 @@
     <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
       <div class="flex items-center gap-4">
         <i class="pi pi-globe text-2xl text-blue-500"></i>
-        <h3 class="text-xl font-semibold">智能事项与日程管理系统</h3>
+        <h3 class="text-xl font-semibold">Chronos</h3>
       </div>
       <p class="text-gray-600 leading-relaxed">
         本系统专注于个人的事项管理与日程规划，通过智能化的任务管理和日程规划功能，能够根据待办事项的优先级和截止日期，自动生成合理的日程规划，帮助用户更清晰地规划每日/每周事务，实现工作与生活的有序平衡。
