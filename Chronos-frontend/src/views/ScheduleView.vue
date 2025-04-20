@@ -20,14 +20,23 @@
           </SelectButton>
         </div>
       </div>
-  
+      
       <!-- List View -->
       <div v-if="viewMode==='list'">
-        <div v-if="schedules.length === 0" class="text-gray-500 text-center mt-8">
+        <Calendar
+          v-model="dateRange"
+          selectionMode="range"
+          dateFormat="yy-mm-dd"
+          :showIcon="true"
+          placeholder="开始日期 - 结束日期"
+          :manualInput="false"
+          class="w-70 mb-4"
+        />
+        <div v-if="filteredSchedules.length === 0" class="text-gray-500 text-center mt-8">
           暂无日程
         </div>
         <div class="grid gap-4">
-          <Card v-for="event in schedules" :key="event.id" class="w-full">
+          <Card v-for="event in filteredSchedules" :key="event.id" class="w-full">
             <template #title>
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span>{{ event.title }}</span>
@@ -214,7 +223,7 @@
   </template>
   
   <script setup>
-  import { ref, computed } from 'vue';
+  import { ref, computed, onMounted } from 'vue';
   import Button from 'primevue/button';
   import SelectButton from 'primevue/selectbutton';
   import Dialog from 'primevue/dialog';
@@ -251,6 +260,53 @@
     { label: '日历', value: 'calendar', icon: 'pi pi-calendar' }
   ];
   
+  // 修正后的日期范围初始化
+  const dateRange = ref([]);
+
+  // 设置默认日期范围的函数
+  function setDefaultDateRange() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 清除时间部分
+    
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 7); // 7天后
+    endDate.setHours(23, 59, 59, 999); // 包含完整的一天
+    
+    dateRange.value = [today, endDate];
+  }
+
+  // 在组件挂载时设置默认范围
+  onMounted(() => {
+    setDefaultDateRange();
+  });
+
+  const filteredSchedules = computed(() => {
+    // 如果没有选择任何日期，返回所有日程
+    if (!dateRange.value || dateRange.value.length === 0) {
+      return schedules.value;
+    }
+    const [startDate, endDate] = dateRange.value;
+    // 如果只选择了开始日期（endDate为null或undefined）
+    if (!endDate) {
+      return schedules.value.filter(event => {
+        if (!event.start) return false;
+        const eventDate = new Date(event.start.split('T')[0]);
+        return eventDate >= startDate;
+      });
+    }
+    // 正常日期范围筛选
+    return schedules.value.filter(event => {
+      if (!event.start) return false;
+      const eventStartDate = new Date(event.start.split('T')[0]);
+      const eventEndDate = event.end ? new Date(event.end.split('T')[0]) : eventStartDate;
+      return (
+        (eventStartDate >= startDate && eventStartDate <= endDate) || 
+        (eventEndDate >= startDate && eventEndDate <= endDate) ||
+        (eventStartDate <= startDate && eventEndDate >= endDate)
+      );
+    });
+  });
+
   const selectedDate = ref(new Date());
   
   const filteredEvents = computed(() => {
@@ -415,14 +471,6 @@
       });
     }
     showLLMDialog.value = false;
-  }
-  
-  function formatDate(date) {
-    if (!date) return '';
-    const y = date.getFullYear();
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${y}-${m}-${d}`;
   }
   </script>
   
