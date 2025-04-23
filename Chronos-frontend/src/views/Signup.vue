@@ -1,144 +1,121 @@
 <template>
-    <div id="container">
-        <form id="loginForm" action="">
-            <h2>注册</h2>
-            <div class="input">
-                <input type="text" placeholder="User Name or E-mail" id="account" v-model="account">
-            </div>
-            <div class="input">
-                <input type="password" placeholder="Password" id="userPassword" v-model="password">
-            </div>
-            <div id="action">
-                <span><router-link to="/login">返回登录</router-link></span>
-            </div>
-            <div id="loginButton">
-                <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">注册</button>
-            </div>
+    <div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br overflow-hidden">
+      <div class="w-full max-w-md mx-auto bg-white rounded-2xl shadow-lg px-8 py-10">
+        <form @submit.prevent="onRegisterClick" class="space-y-6" autocomplete="off">
+          <h2 class="text-3xl font-bold text-center mb-8 flex items-center justify-center gap-2">
+            注册
+          </h2>
+          <div>
+            <span class="p-input-icon-left w-full">
+              <i class="pi pi-user text-gray-500" />
+              <InputText
+                v-model="account"
+                type="text"
+                class="w-full"
+                size="large"
+                placeholder="用户名"
+                autocomplete="username"
+                :class="inputError && !account ? 'border-red-500' : ''"
+              />
+            </span>
+          </div>
+          <div>
+            <span class="p-input-icon-left w-full">
+              <i class="pi pi-lock text-gray-500" />
+              <Password
+                v-model="password"
+                toggleMask
+                :feedback="true"
+                placeholder="密码"
+                class="w-full"
+                inputClass="w-full"
+                size="large"
+                autocomplete="new-password"
+                :class="inputError && !password ? 'border-red-500' : ''"
+              />
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <router-link to="/login" class="text-blue-500 hover:underline text-sm flex items-center">
+              <i class="pi pi-arrow-left text-gray-500 mr-1"></i> 返回登录
+            </router-link>
+          </div>
+          <Button
+            label="注册"
+            icon="pi pi-user-plus"
+            class="w-full"
+            size="large"
+            :loading="loading"
+            @click="onRegisterClick"
+          />
+          <div v-if="regError" class="text-red-500 text-sm mt-4 text-center">
+            {{ regError }}
+          </div>
+          <div v-if="regSuccess" class="text-green-600 text-sm mt-4 text-center">
+            {{ regSuccess }}
+          </div>
         </form>
+      </div>
     </div>
-</template>
-<script>
-import axios from 'axios';
-const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
-console.log(BACKEND_PATH);
-export default {
-    name: 'register',
-    data() {
-        return {
-            account: '',
-            password: '',
-        };
-    },
-    methods: {
-        async onBtnLoginClick() {
-            try {
-                const response = await axios.post(BACKEND_PATH+'/register', {
-                    username: this.account,
-                    password: this.password
-                });
-                if(response.data.error){
-                    alert('注册失败: 用户名已存在');
-                    return;
-                }
-                else{
-                    alert('注册成功');
-                }
-                
-                this.$router.push({ name: 'login' });
-            } catch (error) {
-                if (error.response && error.response.data.error) {
-                    alert(`注册失败: ${error.response.data.error}`);
-                } else {
-                    alert('注册失败: 发生未知错误');
-                }
-            }
-        }
+  </template>
+  
+  <script setup>
+  import { ref } from 'vue'
+  import { useRouter } from 'vue-router'
+  import InputText from 'primevue/inputtext'
+  import Password from 'primevue/password'
+  import Button from 'primevue/button'
+  import axios from 'axios'
+  
+  const account = ref('')
+  const password = ref('')
+  const loading = ref(false)
+  const regError = ref('')
+  const regSuccess = ref('')
+  const inputError = ref(false)
+  
+  const router = useRouter()
+  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH
+  
+  async function onRegisterClick() {
+    regError.value = ''
+    regSuccess.value = ''
+    inputError.value = false
+    if (!account.value || !password.value) {
+      regError.value = '请输入用户名和密码'
+      inputError.value = true
+      return
     }
-};
-</script>
-<style scoped>
-    #container{
-    height:70%;
-    width:63%;
-    position: absolute;
-    left:50%;
-    top:50%;
-    transform: translateX(-50%) translateY(-50%);
-    min-width: 315px;
-    min-height: 453px;
-    max-width: 670px;
-    max-height: 496px;
-}
-form{
-    border:1px solid #a9a9a9;
-    border-radius: 12px;
-    height:90%;
+    loading.value = true
+    try {
+      const response = await axios.post(`${BACKEND_PATH}/register`, {
+        username: account.value,
+        password: password.value
+      })
+      if (response.data.error) {
+        regError.value = '注册失败: ' + response.data.error
+      } else {
+        regSuccess.value = '注册成功，正在跳转登录...'
+        setTimeout(() => {
+          router.push({ name: 'login' })
+        }, 1000)
+      }
+    } catch (error) {
+      if (error.response && error.response.data.error) {
+        regError.value = '注册失败: ' + error.response.data.error
+      } else {
+        regError.value = '注册失败: 发生未知错误'
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+  </script>
+  
+  <style scoped>
+  .p-input-icon-left > .pi {
+    left: 0.75rem;
     top: 50%;
-    font-family: "Gill Sans", sans-serif;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-}
-h2{
-    text-align: center;
-    font-size: 30px;
-    margin-bottom: 60px;
-}
-.input{
-    position: relative;
-    font-size: 40px;
-    height:50px;
-    margin-left: 10%;
-    margin-right: 10%;
-    margin-bottom: 40px;
-}
-input[type="password"]{
-    font-family: "Gill Sans", sans-serif;
-    font-size: 20px;
-    height:99%;
-    width: 96%;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    padding-left: 3%;
-    border: 0.5px solid #6e7275;
-    
-}
-#account{
-    font-family: "Gill Sans", sans-serif;
-    font-size: 20px;
-    height:99%;
-    width: 96%;
-    place-self: center;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    padding-left: 3%;
-    border: 0.5px solid #6e7275;
-}
-#action{
-    margin-left: 10%;
-    margin-right: 10%;
-    display: flex;
-    justify-content:space-between;
-}
-#loginButton{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 50px;
-    margin-top: 20px;
-}
-#redirectInfo{
-    color: red;
-    margin-left: 10%;
-    display: none;
-}
-.login-button{
-    padding: 10px 20px;
-    background-color: #1878de; 
-    color: #fff; 
-    border: none;
-    border-radius: 5px;
-    font-size: 16px;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-</style>
+    transform: translateY(-50%);
+  }
+  </style>
