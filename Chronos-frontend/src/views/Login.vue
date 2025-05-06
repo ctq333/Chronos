@@ -1,144 +1,121 @@
 <template>
-    <div id="container">
-        <form id="loginForm" action="">
-            <h2>登录您的账号</h2>
-            <div class="input">
-                <input type="text" placeholder="User Name or E-mail" id="account" v-model="account">
-            </div>
-            <div class="input">
-                <input type="password" placeholder="Password" id="userPassword" v-model="password">
-            </div>
-            <div id="action">
-                <span><router-link to="/signup">注册账号</router-link></span>
-            </div>
-            <div id="loginButton">
-                <button class="login-button" id="btnLogin" @click.prevent="onBtnLoginClick">登录</button>
-            </div>
+    <div class="fixed inset-0 flex items-center justify-center bg-gradient-to-br overflow-hidden">
+      <div class="w-full max-w-md mx-auto bg-white rounded-2xl shadow-lg px-8 py-10">
+        <form @submit.prevent="onBtnLoginClick" class="space-y-6" autocomplete="off">
+          <h2 class="text-3xl font-bold text-center mb-8 flex items-center justify-center gap-2">
+            登录
+          </h2>
+          <div>
+            <span class="p-input-icon-left w-full">
+              <i class="pi pi-user text-gray-500" />
+              <InputText
+                v-model="account"
+                type="text"
+                class="w-full"
+                size="large"
+                placeholder="用户名或邮箱"
+                autocomplete="username"
+                :class="inputError && !account ? 'border-red-500' : ''"
+              />
+            </span>
+          </div>
+          <div>
+            <span class="p-input-icon-left w-full">
+              <i class="pi pi-lock text-gray-500" />
+              <Password
+                v-model="password"
+                toggleMask
+                :feedback="false"
+                placeholder="密码"
+                class="w-full"
+                inputClass="w-full"
+                size="large"
+                autocomplete="current-password"
+                :class="inputError && !password ? 'border-red-500' : ''"
+              />
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <router-link to="/signup" class="text-blue-500 hover:underline text-sm flex items-center">
+              <i class="pi pi-user-plus mr-1"></i> 注册账号
+            </router-link>
+          </div>
+          <Button
+            label="登录"
+            icon="pi pi-sign-in"
+            class="w-full"
+            size="large"
+            :loading="loading"
+            @click="onBtnLoginClick"
+          />
+          <div v-if="loginError" class="text-red-500 text-sm mt-4 text-center">
+            {{ loginError }}
+          </div>
         </form>
+      </div>
     </div>
-</template>
-<script>
-import router from '@/router';
-import axios from 'axios';
-    const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
-    console.log(BACKEND_PATH);
-    export default {
-        name: 'login',
-        
-        data(){
-            return {
-                account: '',
-                password: '',
-                
-            }
-        },
-        methods:{
-            onBtnLoginClick(){
-                let isSuccess = false;
-                axios.get(BACKEND_PATH+'/login?username=' + this.account + '&password=' + this.password)
-                .then(response => {
-                    if (response.data.length > 0) {
-                        const userInfo = response.data[0];
-                        sessionStorage.setItem("uuid", userInfo.uuid);
-                        sessionStorage.setItem("accessToken", userInfo.accessToken);
-                        sessionStorage.setItem("isLoggedIn", true);
-                        alert("登录成功！");
-                        router.push({ path: '/' }).then(() => router.go(0));;
-                    } else {
-                        // Handle the case where the array is empty
-                        alert("登录失败：用户不存在或密码错误");
-                    }
-                    isSuccess = true;
-                })
-                .catch(error => console.error('Error fetching token:', error));
-            }
-        }
-        
+  </template>
+  
+  <script setup>
+  import { ref } from 'vue'
+  import { useRouter } from 'vue-router'
+  import InputText from 'primevue/inputtext'
+  import Password from 'primevue/password'
+  import Button from 'primevue/button'
+  import axios from 'axios'
+  
+  const account = ref('')
+  const password = ref('')
+  const loading = ref(false)
+  const loginError = ref('')
+  const inputError = ref(false)
+  
+  const router = useRouter()
+  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH
+  
+  function onBtnLoginClick() {
+    loginError.value = ''
+    inputError.value = false
+    if (!account.value || !password.value) {
+        loginError.value = '请输入用户名和密码'
+        inputError.value = true
+        return
     }
-</script>
-<style scoped>
-    #container{
-    height:70%;
-    width:63%;
-    position: absolute;
-    left:50%;
-    top:50%;
-    transform: translateX(-50%) translateY(-50%);
-    min-width: 315px;
-    min-height: 479px;
-    max-width: 670px;
-    max-height: 496px;
-}
-form{
-    border:1px solid #a9a9a9;
-    border-radius: 12px;
-    height:90%;
+    loading.value = true
+    axios
+        .get(`${BACKEND_PATH}/login?username=${encodeURIComponent(account.value)}&password=${encodeURIComponent(password.value)}`)
+        .then(response => {
+        if (response.data.length > 0) {
+            const userInfo = response.data[0]
+            // 判断账户状态
+            if (userInfo.status && userInfo.status !== 'active') {
+            // 你可以根据后端返回的禁用状态调整条件
+            loginError.value = '账户已被管理员禁用，请联系管理员'
+            return
+            }
+            sessionStorage.setItem('uuid', userInfo.uuid)
+            sessionStorage.setItem('accessToken', userInfo.accessToken)
+            sessionStorage.setItem('isLoggedIn', true)
+            router.push({ path: '/' }).then(() => window.location.reload())
+        } else {
+            loginError.value = '登录失败：用户不存在或密码错误'
+        }
+        })
+        .catch(() => {
+        loginError.value = '登录失败：服务器连接异常'
+        })
+        .finally(() => {
+        loading.value = false
+        })
+    }
+  </script>
+  
+  <style scoped>
+  /* PrimeVue左侧图标美化 */
+  .p-input-icon-left > .pi {
+    left: 0.75rem;
     top: 50%;
-    font-family: "Gill Sans", sans-serif;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-}
-h2{
-    text-align: center;
-    font-size: 30px;
-    margin-bottom: 60px;
-}
-.input{
-    position: relative;
-    font-size: 40px;
-    height:50px;
-    margin-left: 10%;
-    margin-right: 10%;
-    margin-bottom: 40px;
-}
-input[type="password"]{
-    font-family: "Gill Sans", sans-serif;
-    font-size: 20px;
-    height:99%;
-    width: 96%;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    padding-left: 3%;
-    border: 0.5px solid #6e7275;
+    transform: translateY(-50%);
     
-}
-#account{
-    font-family: "Gill Sans", sans-serif;
-    font-size: 20px;
-    height:99%;
-    width: 96%;
-    place-self: center;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    padding-left: 3%;
-    border: 0.5px solid #6e7275;
-}
-#action{
-    margin-left: 10%;
-    margin-right: 10%;
-    display: flex;
-    justify-content:space-between;
-}
-#loginButton{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 50px;
-    margin-top: 20px;
-}
-#redirectInfo{
-    color: red;
-    margin-left: 10%;
-    display: none;
-}
-.login-button{
-    padding: 10px 20px;
-    background-color: #1878de; 
-    color: #fff; 
-    border: none;
-    border-radius: 5px;
-    font-size: 16px;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-</style>
+  }
+  </style>

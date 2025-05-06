@@ -55,8 +55,17 @@
               </div>
               <div class="mb-2 text-gray-600">{{ event.description || '无描述' }}</div>
               <div class="flex gap-2 mt-2">
-                <Button icon="pi pi-pencil" rounded text class="p-button-sm mr-2" @click="openEditDialog(event)" />
+                <Button icon="pi pi-pencil" rounded text class="p-button-sm" @click="openEditDialog(event)" />
                 <Button icon="pi pi-trash" rounded text severity="danger" class="p-button-sm" @click="confirmDelete(event)" />
+                <Button
+                  icon="pi pi-user-plus"
+                  rounded
+                  text
+                  severity="info"
+                  class="p-button-sm"
+                  @click="openInviteDialog(event)"
+                  title="邀请协作成员"
+                />
               </div>
             </template>
           </Card>
@@ -94,8 +103,17 @@
                     </div>
                     <div class="mb-2 text-gray-600">{{ slotProps.item.description || '无描述' }}</div>
                     <div class="flex gap-2 mt-2">
-                      <Button icon="pi pi-pencil" rounded text class="p-button-sm mr-2" @click="openEditDialog(slotProps.item)" />
+                      <Button icon="pi pi-pencil" rounded text class="p-button-sm" @click="openEditDialog(slotProps.item)" />
                       <Button icon="pi pi-trash" rounded text severity="danger" class="p-button-sm" @click="confirmDelete(slotProps.item)" />
+                      <Button
+                        icon="pi pi-user-plus"
+                        rounded
+                        text
+                        severity="info"
+                        class="p-button-sm"
+                        @click="openInviteDialog(event)"
+                        title="邀请协作成员"
+                      />
                     </div>
                   </template>
                 </Card>
@@ -217,6 +235,29 @@
             </div>
           </div>
           <Button label="确认创建全部" icon="pi pi-check" class="mt-2" @click="confirmLLMSchedules" :disabled="llmResults.length===0" />
+        </div>
+      </Dialog>
+
+      <!-- Invite Dialog -->
+      <Dialog v-model:visible="showInviteDialog" header="邀请协作成员" modal :style="{width:'350px'}">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">用户名</label>
+            <InputText v-model="inviteUser" placeholder="输入用户名或邮箱" class="w-full" />
+          </div>
+          <div class="flex justify-end gap-2">
+            <Button label="取消" icon="pi pi-times" severity="secondary" @click="showInviteDialog=false" />
+            <Button
+              label="邀请"
+              icon="pi pi-user-plus"
+              :loading="inviteLoading"
+              :disabled="!inviteUser"
+              @click="sendInvite"
+            />
+          </div>
+          <div v-if="inviteResult" :class="inviteResult.success ? 'text-green-600' : 'text-red-500'">
+            {{ inviteResult.message }}
+          </div>
         </div>
       </Dialog>
     </div>
@@ -471,6 +512,35 @@
       });
     }
     showLLMDialog.value = false;
+  }
+
+  const showInviteDialog = ref(false)
+  const inviteUser = ref('')
+  const inviteLoading = ref(false)
+  const inviteResult = ref(null)
+  const inviteEventId = ref(null)
+
+  function openInviteDialog(event) {
+    showInviteDialog.value = true
+    inviteUser.value = ''
+    inviteResult.value = null
+    inviteEventId.value = event.id
+  }
+
+  async function sendInvite() {
+    inviteLoading.value = true
+    inviteResult.value = null
+    // 这里应当替换成真实API
+    try {
+      // 假设: await axios.post('/api/invite', { eventId: inviteEventId.value, username: inviteUser.value })
+      await new Promise(resolve => setTimeout(resolve, 800))
+      inviteResult.value = { success: true, message: `已向 ${inviteUser.value} 发送邀请` }
+      inviteUser.value = ''
+    } catch (e) {
+      inviteResult.value = { success: false, message: '邀请失败，请重试' }
+    } finally {
+      inviteLoading.value = false
+    }
   }
   </script>
   

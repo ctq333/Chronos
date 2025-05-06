@@ -75,8 +75,7 @@
                                 class="text-sm text-gray-500"
                                 size="70"
                                 :model-value="event.status === 'completed' ? 100 : event.progress"
-                                :readonly="true"
-                                :strokeWidth="10"
+								valueTemplate="{value}%"
                             />
                         </div>
                     </template>
