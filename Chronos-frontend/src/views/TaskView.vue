@@ -7,8 +7,6 @@
 					<Button label="创建事项" icon="pi pi-plus" @click="openCreateDialog" class="mr-2" />
 					<Button label="事项智能创建" icon="pi pi-comments" severity="info" @click="openLLMDialog" />
 				</div>
-			</div>
-			<div class="flex flex-wrap items-center gap-2">
 				<SelectButton
 					v-model="filterType"
 					:options="filterTypeOptions"
@@ -23,6 +21,8 @@
 						</span>
 					</template>
 				</SelectButton>
+			</div>
+			<div class="flex flex-wrap items-center gap-2 pt-2">
 				<div v-if="allUserTags.length" class="flex flex-wrap gap-1 ml-2 items-center">
 					<span class="text-gray-500 text-sm mr-1">标签：</span>
 					<Tag
