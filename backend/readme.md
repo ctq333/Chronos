@@ -29,6 +29,20 @@ Windows
 
 `pip3 install -r requirments.txt`
 
+### Config .env file
+
+Create `.env` text file in the backend root folder and set the following environment variables in the file:
+
+```
+GENAI_API_KEY=
+MYSQL_USER=
+MYSQL_PASSWORD=
+MYSQL_HOST=
+MYSQL_PORT=3306
+MYSQL_DB=
+MYSQL_CHARSET=utf8mb4
+```
+
 ### Run Backend
 
 `flask run`
