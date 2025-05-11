@@ -1,7 +1,9 @@
 from flask import Flask
 from app.routes import llm_routes, admin_routes, auth_routes, task_routes, schedule_routes
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 import os
+from dotenv import load_dotenv
 
 db = SQLAlchemy()
 
@@ -23,5 +25,8 @@ def create_app():
     app.register_blueprint(task_routes)
     app.register_blueprint(schedule_routes)
 
+    # CORS configuration
+    allowed_origins = os.getenv("ALLOWED_CORS_ORIGINS", "*").split(",")
+    CORS(app, resources={r"/*": {"origins": allowed_origins}})
 
     return app

@@ -6,6 +6,7 @@ certifi==2025.4.26
 charset-normalizer==3.4.2
 click==8.1.8
 Flask==3.1.0
+flask-cors==5.0.1
 Flask-SQLAlchemy==3.1.1
 google-auth==2.40.1
 google-genai==1.13.0

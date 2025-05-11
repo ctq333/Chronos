@@ -41,6 +41,7 @@ MYSQL_HOST=
 MYSQL_PORT=3306
 MYSQL_DB=
 MYSQL_CHARSET=utf8mb4
+ALLOWED_CORS_ORIGINS=https://domain1.com,https://domain2.com,...
 ```
 
 ### Run Backend
