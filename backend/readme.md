@@ -26,9 +26,9 @@ Windows
 > .venv\Scripts\activate
 ```
 ### Install Depedencies
-
-`pip3 install -r requirments.txt`
-
+```
+pip3 install -r requirments.txt
+```
 ### Config .env file
 
 Create `.env` text file in the backend root folder and set the following environment variables in the file:
@@ -44,6 +44,6 @@ MYSQL_CHARSET=utf8mb4
 ```
 
 ### Run Backend
-
-`flask run`
-
+```
+flask run
+```
