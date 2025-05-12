@@ -42,6 +42,31 @@
         </div>
       </template>
     </div>
+    <div class="max-w-6xl w-full px-6 mb-6">
+      <div class="flex items-center gap-3 mb-2">
+        <i class="pi pi-clock text-gray-400"></i>
+        <span class="text-lg font-semibold text-gray-700">历史周报</span>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-2">
+        <Button
+          v-for="r in historyReports"
+          :key="r.id"
+          :label="r.week"
+          size="small"
+          :outlined="selectedHistory?.id !== r.id"
+          :severity="selectedHistory?.id === r.id ? 'primary' : 'secondary'"
+          @click="selectedHistory = r"
+        />
+      </div>
+      <div
+        v-if="selectedHistory"
+        class="bg-white/70 rounded-lg p-4 shadow-inner border border-gray-200 text-gray-800 whitespace-pre-line"
+        style="min-height:120px"
+      >
+        {{ selectedHistory.content }}
+      </div>
+      <div v-else class="text-gray-400">暂无历史周报</div>
+    </div>
   </div>
 </template>
 
@@ -78,6 +103,50 @@ function generateReport() {
 function reset() {
   step.value = 'init'
   reportText.value = ''
+}
+
+const historyReports = ref([
+  {
+    id: 1,
+    week: '2024年第15周',
+    content: `【本周工作总结】
+- 完成X功能开发。
+- 修复若干线上bug。
+- 团队技术分享一次。
+
+【下周工作计划】
+- 启动Y模块重构。
+- 参与产品需求讨论。`
+  },
+  {
+    id: 2,
+    week: '2024年第14周',
+    content: `【本周工作总结】
+- 参与需求评审。
+- 完成自动化测试覆盖。
+
+【下周工作计划】
+- 跟进上线回归。
+- 向团队同步最佳实践。`
+  }
+])
+
+const selectedHistory = ref(historyReports.value[0] || null)
+
+// 生成后自动保存到历史（可选）
+function saveCurrentToHistory() {
+  // 假设使用“今年第N周”作为周报标题
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), 0, 1)
+  const dayOfYear = Math.floor((now - firstDay) / (24*60*60*1000)) + 1
+  const weekNum = Math.ceil(dayOfYear / 7)
+  const weekStr = `${now.getFullYear()}年第${weekNum}周`
+  historyReports.value.unshift({
+    id: Date.now(),
+    week: weekStr,
+    content: reportText.value
+  })
+  selectedHistory.value = historyReports.value[0]
 }
 </script>
 

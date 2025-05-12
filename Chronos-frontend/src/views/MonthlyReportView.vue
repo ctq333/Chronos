@@ -1,11 +1,20 @@
 <template>
   <div class="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br p-6">
     <!-- 月报标题，左对齐 -->
-    <div class="max-w-6xl w-full px-6">
+    <div class="max-w-6xl w-full px-6 flex items-center justify-between">
       <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
         <i class="pi pi-file-edit text-gray-500"></i>
         月报
       </h2>
+      <Button
+        label="历史月报"
+        icon="pi pi-clock"
+        size="small"
+        class="mb-2"
+        severity="secondary"
+        outlined
+        @click="openHistoryDialog"
+      />
     </div>
     <!-- 毛玻璃大框 -->
     <div
@@ -42,6 +51,25 @@
         </div>
       </template>
     </div>
+    <Dialog v-model:visible="showHistoryDialog" header="历史月报" modal :style="{width: '520px'}">
+      <div v-if="historyReports.length">
+        <div class="flex gap-2 mb-4 flex-wrap">
+          <Button
+            v-for="r in historyReports"
+            :key="r.id"
+            :label="r.month"
+            size="small"
+            :outlined="selectedHistory?.id !== r.id"
+            :severity="selectedHistory?.id === r.id ? 'primary' : 'secondary'"
+            @click="selectedHistory = r"
+          />
+        </div>
+        <div class="bg-white/80 rounded-lg p-4 shadow-inner border border-gray-200 text-gray-800 whitespace-pre-line min-h-[200px]">
+          {{ selectedHistory?.content || '无内容' }}
+        </div>
+      </div>
+      <div v-else class="text-gray-500 py-6 text-center">暂无历史月报</div>
+    </Dialog>
   </div>
 </template>
 
@@ -72,12 +100,63 @@ function generateReport() {
 【问题与建议】
 - 希望加强跨部门沟通，提前介入项目需求讨论。`
     step.value = 'done'
+    saveCurrentToHistory()
   }, 1800)
+  
 }
 
 function reset() {
   step.value = 'init'
   reportText.value = ''
+}
+
+import Dialog from 'primevue/dialog'
+
+const historyReports = ref([
+  {
+    id: 1,
+    month: '2024-04',
+    content: `【本月工作总结】
+- 参与X项目，与团队协作完成阶段目标。
+- 学习新技术栈，输出内部分享文档。
+
+【下月工作计划】
+- 深入推进Y业务线开发。
+- 组织团队技术交流。
+
+【问题与建议】
+- 资源协调有待优化。`
+  },
+  {
+    id: 2,
+    month: '2024-03',
+    content: `【本月工作总结】
+- 完成产品迭代发布。
+- 优化线上流程，提升用户满意度。
+
+【下月工作计划】
+- 启动新项目需求讨论。
+- 加强同其他部门沟通。`
+  }
+])
+
+const showHistoryDialog = ref(false)
+const selectedHistory = ref(null)
+
+function openHistoryDialog() {
+  showHistoryDialog.value = true
+  selectedHistory.value = historyReports.value[0] || null
+}
+
+// 可选：生成后自动保存到历史
+function saveCurrentToHistory() {
+  const now = new Date()
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  historyReports.value.unshift({
+    id: Date.now(),
+    month: monthStr,
+    content: reportText.value
+  })
 }
 </script>
 
