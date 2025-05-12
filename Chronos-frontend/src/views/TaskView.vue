@@ -70,13 +70,14 @@
                             <span class="text-sm text-gray-500">计划：{{ event.planDate }}</span>
                             <span class="text-sm text-gray-500">截止：{{ event.dueDate }}</span>
                             <span class="text-sm text-gray-500">剩余时间：{{ getRemainingDays(event.dueDate) }}</span>
-                            <!-- knob进度：完成100，否则原值 -->
-                            <Knob
+                            <div v-if="event.status !== 'completed'">
+							<Knob
                                 class="text-sm text-gray-500"
                                 size="70"
-                                :model-value="event.status === 'completed' ? 100 : event.progress"
+                                :model-value=event.progress
 								valueTemplate="{value}%"
                             />
+							</div>
                         </div>
                     </template>
                     <template #content>
@@ -119,9 +120,10 @@
                                 </div>
                             </div>
                         </div>
+
                         <div class="flex sm:flex-row sm:items-center justify-between">
                             <div class="flex items-center gap-1">
-                                <Button icon="pi pi-calendar-plus" rounded text class="p-button-sm" title="推迟日程" @click.stop="openPostponeDialog(event)" />
+                                <Button icon="pi pi-calendar-plus" rounded text class="p-button-sm" title="推迟事项" @click.stop="openPostponeDialog(event)" />
                                 <Button icon="pi pi-plus-circle" rounded text class="p-button-sm" title="创建子任务" @click.stop="openAddSubTaskDialog(event)" />
                                 <Button icon="pi pi-sparkles" rounded text class="p-button-sm" title="智能创建子任务" @click.stop="openSmartSubTaskDialog(event)" />
 								<Button
@@ -275,7 +277,7 @@
 		</Dialog>
 
 		<!-- 推迟日程对话框 -->
-		<Dialog v-model:visible="showPostponeDialog" header="推迟日程" :modal="true" :closable="false" :style="{width:'340px'}">
+		<Dialog v-model:visible="showPostponeDialog" header="推迟事项" :modal="true" :closable="false" :style="{width:'340px'}">
 			<form @submit.prevent="onPostponeSubmit">
 				<div class="mb-3">
 					<label>新的计划处理日期 *</label>
@@ -787,7 +789,6 @@ function toggleCompleted(id) {
 			// 可自定义设置：tasks.value[idx].progress = 0;
 		} else {
 			tasks.value[idx].status = 'completed';
-			tasks.value[idx].progress = 100;
 		}
 	}
 }
