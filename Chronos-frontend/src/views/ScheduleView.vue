@@ -64,7 +64,7 @@
                   severity="info"
                   class="p-button-sm"
                   @click="openInviteDialog(event)"
-                  title="邀请协作成员"
+                  title="邀请成员"
                 />
               </div>
             </template>
