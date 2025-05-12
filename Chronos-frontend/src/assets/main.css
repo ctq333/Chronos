@@ -1,2 +1,5 @@
 /* main.css */
 @import "tailwindcss";
+body {
+    background: #fafbfc;
+}

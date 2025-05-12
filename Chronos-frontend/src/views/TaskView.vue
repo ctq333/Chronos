@@ -1,10 +1,10 @@
 <template>
-	<div class="p-4 max-w-5xl mx-auto">
+	<div class="p-4 pt-10 max-w-5xl mx-auto">
 		<!-- Toolbar & Filter -->
 		<div class="flex flex-col gap-2 mb-4">
 			<div class="flex justify-between items-center">
-				<div>
-					<Button label="创建事项" icon="pi pi-plus" @click="openCreateDialog" class="mr-2" />
+				<div class="flex-wrap">
+					<Button label="创建事项" icon="pi pi-plus" @click="openCreateDialog" class="mr-2 mb-2" />
 					<Button label="事项智能创建" icon="pi pi-comments" severity="info" @click="openLLMDialog" />
 				</div>
 				<SelectButton
@@ -124,6 +124,14 @@
                                 <Button icon="pi pi-calendar-plus" rounded text class="p-button-sm" title="推迟日程" @click.stop="openPostponeDialog(event)" />
                                 <Button icon="pi pi-plus-circle" rounded text class="p-button-sm" title="创建子任务" @click.stop="openAddSubTaskDialog(event)" />
                                 <Button icon="pi pi-sparkles" rounded text class="p-button-sm" title="智能创建子任务" @click.stop="openSmartSubTaskDialog(event)" />
+								<Button
+									icon="pi pi-calendar"
+									rounded
+									text
+									class="p-button-sm"
+									title="由事项创建日程"
+									@click.stop="openScheduleDialog(event)"
+								/>
                             </div>
                             <div class="flex items-center gap-1">
                                 <Button icon="pi pi-pencil" rounded text class="p-button-sm" @click="openEditDialog(event)" />
@@ -314,6 +322,52 @@
 				<div v-else class="text-gray-500 text-center py-6">未获取到可用子任务</div>
 			</div>
 		</Dialog>
+
+		<!-- 创建日程对话框 -->
+		<Dialog v-model:visible="showScheduleDialog" header="由事项创建日程" :modal="true" :closable="false" :style="{width:'400px'}">
+		<form @submit.prevent="onScheduleSubmit">
+			<div class="mb-3">
+			<label>主题 *</label>
+			<InputText v-model="scheduleForm.title" maxlength="50" required class="w-full" />
+			</div>
+			<div class="mb-3 flex gap-2">
+			<div class="flex-1">
+				<label>开始日期 *</label>
+				<Calendar v-model="scheduleForm.startDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
+			</div>
+			<div class="flex-1">
+				<label>开始时间 *</label>
+				<InputText v-model="scheduleForm.startTime" placeholder="HH:mm" required class="w-full" />
+			</div>
+			</div>
+			<div class="mb-3 flex gap-2">
+			<div class="flex-1">
+				<label>结束日期 *</label>
+				<Calendar v-model="scheduleForm.endDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
+			</div>
+			<div class="flex-1">
+				<label>结束时间 *</label>
+				<InputText v-model="scheduleForm.endTime" placeholder="HH:mm" required class="w-full" />
+			</div>
+			</div>
+			<div class="mb-3">
+			<label>地点</label>
+			<InputText v-model="scheduleForm.location" maxlength="100" class="w-full" />
+			</div>
+			<div class="mb-3">
+			<label>链接</label>
+			<InputText v-model="scheduleForm.link" maxlength="200" class="w-full" placeholder="如 https://..."/>
+			</div>
+			<div class="mb-3">
+			<label>描述</label>
+			<Textarea v-model="scheduleForm.description" maxlength="500" rows="3" class="w-full" />
+			</div>
+			<div class="flex justify-end gap-2">
+			<Button label="取消" icon="pi pi-times" severity="secondary" @click="showScheduleDialog=false" type="button" />
+			<Button label="创建" icon="pi pi-check" type="submit" />
+			</div>
+		</form>
+		</Dialog>
 	</div>
 </template>
 
@@ -432,17 +486,50 @@ const allUserTags = computed(() => {
 
 const filteredTasks = computed(() => {
 	let arr = tasks.value;
-	if (filterType.value === 'completed') {
-		arr = arr.filter(t => t.status === 'completed');
-	} else if (filterType.value === 'not-completed') {
-		arr = arr.filter(t => t.status !== 'completed');
-	}
+
+	// 标签筛选
 	if (selectedTags.value.length) {
 		arr = arr.filter(t =>
 			t.tags && t.tags.some(tag => selectedTags.value.includes(tag))
 		);
 	}
-	return arr;
+
+	// 筛选类型
+	if (filterType.value === 'completed') {
+		arr = arr.filter(t => t.status === 'completed');
+	} else if (filterType.value === 'not-completed') {
+		arr = arr.filter(t => t.status !== 'completed');
+	}
+
+	// 分两组：未完成和已完成
+	const uncompleted = arr.filter(t => t.status !== 'completed');
+	const completed = arr.filter(t => t.status === 'completed');
+
+	// 未完成：截止日期升序，截止一样则计划日期升序
+	uncompleted.sort((a, b) => {
+		const dueA = a.dueDate ? new Date(a.dueDate) : new Date(0);
+		const dueB = b.dueDate ? new Date(b.dueDate) : new Date(0);
+		if (dueA.getTime() !== dueB.getTime()) {
+			return dueA - dueB;
+		}
+		const planA = a.planDate ? new Date(a.planDate) : new Date(0);
+		const planB = b.planDate ? new Date(b.planDate) : new Date(0);
+		return planA - planB;
+	});
+
+	// 已完成：截止日期降序，截止一样则计划日期降序
+	completed.sort((a, b) => {
+		const dueA = a.dueDate ? new Date(a.dueDate) : new Date(0);
+		const dueB = b.dueDate ? new Date(b.dueDate) : new Date(0);
+		if (dueA.getTime() !== dueB.getTime()) {
+			return dueB - dueA;
+		}
+		const planA = a.planDate ? new Date(a.planDate) : new Date(0);
+		const planB = b.planDate ? new Date(b.planDate) : new Date(0);
+		return planB - planA;
+	});
+
+	return [...uncompleted, ...completed];
 });
 
 // ========== 新增/编辑/删除等逻辑 ==========
@@ -703,6 +790,54 @@ function toggleCompleted(id) {
 			tasks.value[idx].progress = 100;
 		}
 	}
+}
+
+// 日程对话框相关
+const showScheduleDialog = ref(false)
+const scheduleForm = ref({
+  title: '',
+  startDate: '',
+  startTime: '',
+  endDate: '',
+  endTime: '',
+  location: '',
+  link: '',
+  description: ''
+})
+
+// 打开日程对话框并填充事项信息
+function openScheduleDialog(task) {
+  // 计划日期为起始，截止日期为结束
+  scheduleForm.value = {
+    title: task.title,
+    startDate: task.planDate ? new Date(task.planDate) : '',
+    startTime: '09:00',
+    endDate: task.dueDate ? new Date(task.dueDate) : (task.planDate ? new Date(task.planDate) : ''),
+    endTime: '10:00',
+    location: '',
+    link: '',
+    description: task.notes || ''
+  }
+  showScheduleDialog.value = true;
+}
+function onScheduleSubmit() {
+  const f = scheduleForm.value;
+  if (!f.title || !f.startDate || !f.startTime || !f.endDate || !f.endTime) {
+    alert('请填写所有必填字段');
+    return;
+  }
+  const startDateStr = formatDateObjToStr(f.startDate);
+  const endDateStr = formatDateObjToStr(f.endDate);
+  schedules.value.push({
+    id: Date.now() + Math.random(),
+    title: f.title,
+    start: `${startDateStr}T${f.startTime}`,
+    end: `${endDateStr}T${f.endTime}`,
+    location: f.location,
+    link: f.link,
+    description: f.description
+  });
+  showScheduleDialog.value = false;
 }
 </script>
 <style scoped>
