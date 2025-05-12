@@ -65,6 +65,8 @@
 import { ref, computed } from 'vue';
 import OrderList from 'primevue/orderlist';
 
+const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+
 // 示例数据
 const tasks = ref([
   { 

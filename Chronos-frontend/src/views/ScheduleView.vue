@@ -274,6 +274,8 @@
   import Card from 'primevue/card';
   import Timeline from 'primevue/timeline';
   
+  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+  
   const schedules = ref([
     {
       id: 1,

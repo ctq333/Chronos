@@ -77,6 +77,8 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 
+const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+
 const step = ref('init') // 'init' | 'loading' | 'done'
 const reportText = ref('')
 

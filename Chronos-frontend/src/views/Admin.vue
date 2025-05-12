@@ -80,6 +80,8 @@ import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import Tag from 'primevue/tag';
 
+const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+
 // 用户数据
 const users = ref([
 { id: 1, username: 'admin', status: true, password: '******' },

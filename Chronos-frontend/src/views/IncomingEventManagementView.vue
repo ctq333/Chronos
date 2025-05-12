@@ -56,6 +56,8 @@
   import Column from 'primevue/column';
   import Button from 'primevue/button';
   
+  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+  
   // 模拟数据
   const schedules = ref([
     { id: 1, name: '团队周会', startTime: '2023-10-01T09:00:00', endTime: '2023-10-01T10:00:00', location: '会议室A' },

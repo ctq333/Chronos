@@ -386,6 +386,8 @@ import Knob from 'primevue/knob';
 import Tag from 'primevue/tag';
 import Checkbox from 'primevue/checkbox';
 
+const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+
 function getPriorityText(priority) {
 	const texts = { 1: '低', 2: '中', 3: '高', 4: '紧急' };
 	return texts[priority] || priority;
