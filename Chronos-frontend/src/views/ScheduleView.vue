@@ -112,7 +112,7 @@
                         severity="info"
                         class="p-button-sm"
                         @click="openInviteDialog(event)"
-                        title="邀请协作成员"
+                        title="邀请成员"
                       />
                     </div>
                   </template>
@@ -239,11 +239,11 @@
       </Dialog>
 
       <!-- Invite Dialog -->
-      <Dialog v-model:visible="showInviteDialog" header="邀请协作成员" modal :style="{width:'350px'}">
+      <Dialog v-model:visible="showInviteDialog" header="邀请成员" modal :style="{width:'350px'}">
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1">用户名</label>
-            <InputText v-model="inviteUser" placeholder="输入用户名或邮箱" class="w-full" />
+            <InputText v-model="inviteUser" placeholder="输入用户名" class="w-full" />
           </div>
           <div class="flex justify-end gap-2">
             <Button label="取消" icon="pi pi-times" severity="secondary" @click="showInviteDialog=false" />
