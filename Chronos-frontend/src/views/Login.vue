@@ -64,7 +64,7 @@
   import Button from 'primevue/button'
   import axios from 'axios'
   
-  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+
   
   const account = ref('')
   const password = ref('')
