@@ -1,4 +1,4 @@
-from .. import db
+from app import db
 
 class Schedule(db.Model):
     __tablename__ = 'schedule'

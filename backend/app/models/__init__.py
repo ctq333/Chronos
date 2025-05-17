@@ -1,4 +1,4 @@
-from .. import db
+
 
 # Import your models so SQLAlchemy knows about them
 from .user import User
