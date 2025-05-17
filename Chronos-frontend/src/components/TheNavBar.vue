@@ -42,23 +42,16 @@
 <script setup>
 import { ref, computed, watchEffect } from "vue";
 import { useRouter } from "vue-router";
+import store from '@/store';
 import Menubar from 'primevue/menubar';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 
-// --- Auth State ---
-const isLoggedIn = ref(!!sessionStorage.getItem('isLoggedIn'));
-const isAdmin = ref(!!sessionStorage.getItem('isAdmin'));
-
-watchEffect(() => {
-    isLoggedIn.value = !!sessionStorage.getItem('isLoggedIn');
-    isAdmin.value = !!sessionStorage.getItem('isAdmin');
-});
-
 // --- Search ---
 const searchQuery = ref('');
 const router = useRouter();
+const isLoggedIn = store.getters.isLogin;
 function onSearch() {
     if (searchQuery.value) {
         router.push({ path: '/search/' + searchQuery.value });
@@ -67,13 +60,7 @@ function onSearch() {
 
 // --- Logout ---
 function logout() {
-    sessionStorage.removeItem('isLoggedIn');
-    sessionStorage.removeItem('isAdmin');
-    sessionStorage.removeItem('uuid');
-    sessionStorage.removeItem('accessToken');
-    isLoggedIn.value = false;
-    isAdmin.value = false;
-    router.push({ path: '/' });
+    store.dispatch('logout')
 }
 
 // --- Menu Items (Auto-generated from your routes) ---
@@ -89,12 +76,12 @@ const items = computed(() => {
     ];
 
     // Add admin entry only if admin is logged in
-    if (isAdmin.value) {
+    if (store.getters.isAdmin) {
         baseItems.splice(1, 0, { label: 'Admin', icon: 'pi pi-cog', url: '/admin' });
     }
 
     // Hide Login/Signup if already logged in
-    if (isLoggedIn.value) {
+    if (store.getters.isLogin) {
         return baseItems.filter(item => item.url !== '/login' && item.url !== '/signup');
     }
     return baseItems;

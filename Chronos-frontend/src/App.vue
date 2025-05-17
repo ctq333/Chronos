@@ -1,13 +1,16 @@
 <script setup>
 import { ref } from 'vue';
+import { useRoute } from 'vue-router'
 import TheNavBar from '@/components/TheNavBar.vue';
 import Button from 'primevue/button';
+
+const route = useRoute()
 
 </script>
 
 <template>
   <div class="app-layout">
-    <TheNavBar />
+    <TheNavBar v-if="!route.meta.hideNavBar" />
     <main class="main-content">
       <router-view />
     </main>
