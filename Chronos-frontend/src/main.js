@@ -4,8 +4,10 @@ import App from './App.vue';
 import Aura from '@primeuix/themes/aura';
 import Nora from '@primeuix/themes/nora';
 import Material from '@primeuix/themes/material';
+import ToastService from 'primevue/toastservice';
 
 import router from '@/router/index.js'
+import store from '@/store';
 import 'primeicons/primeicons.css'
 import Ripple from 'primevue/ripple';
 import "./assets/main.css";
@@ -44,6 +46,8 @@ app.use(PrimeVue, {
     inputStyle: 'filled'
 });
 app.use(router)
+app.use(store)
+app.use(ToastService);
 
 //app.directive('ripple', Ripple);
 

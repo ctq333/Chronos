@@ -1,5 +1,7 @@
 <template>
   <div class="bg-gray-50">
+    <Toast />
+
     <div class="p-6 max-w-7xl mx-auto">
       <div class="mb-6">
         <h2 class="text-3xl font-medium text-gray-800 mb-6">用户列表</h2>
@@ -10,7 +12,7 @@
         </div>
       </div>
       
-      <DataTable :value="users" v-model:selection="selectedUsers" selectionMode="multiple"
+      <DataTable :value="users" v-model:selection="selectedUsers" selectionMode="multiple" :key-field="id"
                 class="p-datatable-sm" scrollable scrollHeight="65vh" tableStyle="min-width: 50rem">
         <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
         <Column field="username" header="用户名" headerStyle="width: 50%"></Column>
@@ -71,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Dialog from 'primevue/dialog';
@@ -79,15 +81,14 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import Tag from 'primevue/tag';
+import request from '@/utils/request'
+import { useToast } from 'primevue/usetoast';
+import Toast from 'primevue/toast'
 
-const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+const toast = useToast();
 
 // 用户数据
-const users = ref([
-{ id: 1, username: 'admin', status: true, password: '******' },
-{ id: 2, username: 'user1', status: false, password: '123456' },
-{ id: 3, username: 'tester', status: true, password: 'test@2023' }
-]);
+const users = ref([]);
 
 // 状态管理
 const selectedUsers = ref([]);
@@ -98,60 +99,217 @@ const currentUser = ref(null);
 
 // 表单数据
 const newUser = ref({
-username: '',
-password: ''
+  username: '',
+  password: ''
 });
 
 const resetData = ref({
-newPassword: '',
-confirmPassword: ''
+  newPassword: '',
+  confirmPassword: ''
 });
 
+// 初始化获取用户列表
+watch(() => {
+  fetchUsers();
+}, [], { immediate: true });
+
+async function fetchUsers() {
+  try {
+    const response = await request.get('/admin/users');
+    if (response.data.code === 200){
+      users.value = response.data.users;
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: '失败',
+        detail: response.data.message || '获取用户失败',
+        life: 3000
+      });
+    }
+  } catch (error) {
+    console.error('获取用户失败:', error);
+    toast.add({
+        severity: 'error',
+        summary: '失败',
+        detail: error.response?.data?.message || '获取用户失败',
+        life: 3000
+      });
+  }
+}
+
 // 用户操作
-const toggleStatus = (user) => {
-user.status = !user.status;
+async function toggleStatus(user){
+  try {
+    const response = await request.put(`/admin/users/${user.id}/status`);
+    if (response.data.code === 200){
+      fetchUsers()
+      toast.add({
+          severity: 'success',
+          summary: '成功',
+          detail: "修改用户状态成功",
+          life: 3000
+        });
+    } else {
+      toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "修改用户状态失败：" + response.data.message,
+          life: 3000
+        });
+    }
+  } catch (error) {
+    console.error('切换状态失败:', error.response?.data?.message || '未知错误');
+    toast.add({
+        severity: 'error',
+        summary: '失败',
+        detail: error.response?.data?.message || '切换状态失败',
+        life: 3000
+      });
+  }
 };
 
 const openResetDialog = (user) => {
-currentUser.value = user;
-showResetDialog.value = true;
+  currentUser.value = user;
+  showResetDialog.value = true;
 };
 
-const createUser = () => {
-if (newUser.value.username && newUser.value.password) {
-    users.value.push({
-    id: Date.now(),
-    ...newUser.value,
-    status: true
+async function createUser() {
+  if (newUser.value.username && newUser.value.password) {
+    try {
+      const response = await request.post('/admin/users', newUser.value);
+      if (response.data.code === 200) {
+        toast.add({
+          severity: 'success',
+          summary: '成功',
+          detail: "添加用户成功",
+          life: 3000
+        });
+        fetchUsers();
+        showAddDialog.value = false;
+        newUser.value = { username: '', password: '' };
+      } else {
+        toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "添加用户失败：" + response.data.message,
+          life: 3000
+        });
+      }
+    } catch (error) {
+      console.error('创建用户失败:', error.response?.data?.message || '未知错误');
+      toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "添加用户失败：" + error.response?.data?.message || "未知错误",
+          life: 3000
+        });
+    }
+  } else {
+    toast.add({
+      severity: 'error',
+      summary: '失败',
+      detail: '请输入用户名和密码',
+      life: 3000
     });
-    showAddDialog.value = false;
-    newUser.value = { username: '', password: '' };
-}
+  }
 };
 
 const confirmDelete = () => {
-showDeleteConfirm.value = true;
+  showDeleteConfirm.value = true;
 };
 
-const deleteUsers = () => {
-users.value = users.value.filter(user => 
-    !selectedUsers.value.some(selected => selected.id === user.id)
-);
-selectedUsers.value = [];
-showDeleteConfirm.value = false;
+async function deleteUsers(){
+  if (selectedUsers.value.length === 0) return;
+
+  try {
+    const response = await request.delete('/admin/users/batch', {
+      data: { user_ids: selectedUsers.value.map(u => u.id) }
+    });
+    if (response.data.code === 200){
+      fetchUsers();
+      toast.add({
+          severity: 'success',
+          summary: '成功',
+          detail: "删除用户成功",
+          life: 3000
+        });
+    } else {
+      toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "删除用户失败：" + response.data.message,
+          life: 3000
+        });
+    }
+    selectedUsers.value = [];
+    showDeleteConfirm.value = false;
+  } catch (error) {
+    console.error('删除用户失败:', error.response?.data?.message || '未知错误');
+    toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: '删除用户失败:' + error.response?.data?.message || '未知错误',
+          life: 3000
+        });
+  }
 };
 
-const confirmReset = () => {
-if (resetData.value.newPassword === resetData.value.confirmPassword) {
-    currentUser.value.password = resetData.value.newPassword;
-    showResetDialog.value = false;
-    resetData.value = { newPassword: '', confirmPassword: '' };
-}
+async function confirmReset() {
+  if (resetData.value.newPassword !== resetData.value.confirmPassword) {
+    toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "两次密码不一致",
+          life: 3000
+        });
+    return;
+  }
+  if (resetData.value.newPassword === "" ||  resetData.value.confirmPassword === "") {
+    toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "密码不能为空",
+          life: 3000
+        });
+    return;
+  }
+
+  try {
+    const response = await request.put(`/admin/users/${currentUser.value.id}/password`, {
+      new_password: resetData.value.newPassword
+    });
+    if (response.data.code === 200){
+      toast.add({
+          severity: 'success',
+          summary: '成功',
+          detail: "重置密码成功",
+          life: 3000
+        });
+        showResetDialog.value = false;
+        resetData.value = { newPassword: '', confirmPassword: '' };
+    } else {
+      toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "重置密码失败：" + response.data.message,
+          life: 3000
+        });
+    }
+    
+  } catch (error) {
+    console.error('重置密码失败:', error.response?.data?.message || '未知错误');
+    toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: '重置密码失败:' + error.response?.data?.message || '未知错误',
+          life: 3000
+        });
+  }
 };
 
 const cancelReset = () => {
-showResetDialog.value = false;
-resetData.value = { newPassword: '', confirmPassword: '' };
+  showResetDialog.value = false;
+  resetData.value = { newPassword: '', confirmPassword: '' };
 };
 </script>
 
