@@ -1,5 +1,8 @@
 import axios from 'axios'
 import store from '@/store'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 // create an axios instance
 const http = axios.create({
@@ -18,6 +21,7 @@ http.interceptors.request.use(config => {
 
   if (!store.getters.isLogin) {
     store.dispatch('logout')
+    router.push("/login")
     return Promise.reject(new Error('Token expired'))
   }
 

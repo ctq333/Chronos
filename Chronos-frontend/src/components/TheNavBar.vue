@@ -61,6 +61,7 @@ function onSearch() {
 // --- Logout ---
 function logout() {
     store.dispatch('logout')
+    router.push("/login")
 }
 
 // --- Menu Items (Auto-generated from your routes) ---

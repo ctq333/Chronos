@@ -255,20 +255,21 @@ async function deleteUsers(){
 };
 
 async function confirmReset() {
-  if (resetData.value.newPassword !== resetData.value.confirmPassword) {
-    toast.add({
-          severity: 'error',
-          summary: '失败',
-          detail: "两次密码不一致",
-          life: 3000
-        });
-    return;
-  }
   if (resetData.value.newPassword === "" ||  resetData.value.confirmPassword === "") {
     toast.add({
           severity: 'error',
           summary: '失败',
           detail: "密码不能为空",
+          life: 3000
+        });
+    return;
+  }
+  
+  if (resetData.value.newPassword !== resetData.value.confirmPassword) {
+    toast.add({
+          severity: 'error',
+          summary: '失败',
+          detail: "两次密码不一致",
           life: 3000
         });
     return;

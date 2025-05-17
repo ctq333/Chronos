@@ -1,7 +1,4 @@
 import { createStore } from 'vuex'
-import { useRouter } from "vue-router";
-
-const router = useRouter();
 
 export default createStore({
   state: {
@@ -41,7 +38,6 @@ export default createStore({
     logout({ commit }) {
       commit('CLEAR_USER')
       commit('CLEAR_TOKEN')
-      router.push("/login")
     }
   },
   getters: {
