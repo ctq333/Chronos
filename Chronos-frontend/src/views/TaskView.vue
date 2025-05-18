@@ -154,60 +154,7 @@
 			</div>
 		</div>
 
-		<!-- 创建/编辑事项对话框（全功能: 子任务增删改） -->
-		<Dialog v-model:visible="showDialog" :header="dialogMode==='create'?'新建事项':'编辑事项'" :modal="true" :closable="false" :style="{width:'480px'}">
-			<form @submit.prevent="onSubmit">
-				<div class="mb-3">
-					<label>标题 *</label>
-					<InputText v-model="form.title" maxlength="50" required class="w-full" />
-				</div>
-				<div class="mb-3 flex gap-2">
-					<div class="flex-1">
-						<label>计划处理日期 *</label>
-						<Calendar v-model="form.planDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
-					</div>
-					<div class="flex-1">
-						<label>截止日期 *</label>
-						<Calendar v-model="form.dueDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
-					</div>
-				</div>
-				<div class="mb-3">
-					<label>优先级</label>
-					<SelectButton 
-						v-model="form.priority"
-						:options="priorityOptions"
-						optionLabel="label"
-						optionValue="value"
-						class="w-full"
-					/>
-				</div>
-				<div class="mb-3">
-					<label>标签（逗号分隔）</label>
-					<InputText v-model="form.tagsInput" placeholder="如：设计,前端,项目" class="w-full" />
-				</div>
-				<div class="mb-3">
-					<label>备注</label>
-					<Textarea v-model="form.notes" maxlength="200" rows="3" class="w-full" />
-				</div>
-				<!-- 子任务编辑区 -->
-				<div class="mb-3">
-					<label class="block mb-1">子任务</label>
-					<div v-for="(sub, idx) in form.subtasks" :key="sub.id" class="flex items-center gap-2 mb-2">
-						<Checkbox v-model="sub.completed" :binary="true" />
-						<InputText v-model="sub.title" placeholder="子任务标题" class="flex-1" />
-						<Button icon="pi pi-trash" text severity="danger" @click="removeEditSubTask(idx)" />
-					</div>
-					<div class="flex gap-2 mt-1">
-						<InputText v-model="newSubTaskTitle" placeholder="新增子任务标题" class="flex-1" @keyup.enter="addEditSubTask" />
-						<Button icon="pi pi-plus" label="添加" class="p-button-sm" @click="addEditSubTask" :disabled="!newSubTaskTitle.trim()" />
-					</div>
-				</div>
-				<div class="flex justify-end gap-2">
-					<Button label="取消" icon="pi pi-times" severity="secondary" @click="showDialog=false" type="button" />
-					<Button :label="dialogMode==='create'?'创建':'保存'" icon="pi pi-check" type="submit" />
-				</div>
-			</form>
-		</Dialog>
+
 
 		<!-- 智能事项批量创建对话框 -->
 		<Dialog v-model:visible="showLLMDialog" header="LLM智能创建事项" modal style="width: 700px">
@@ -599,43 +546,77 @@ function onSubmit() {
 		alert('请填写所有必填字段');
 		return;
 	}
-	const planDateStr = formatDateObjToStr(form.value.planDate);
-	const dueDateStr = formatDateObjToStr(form.value.dueDate);
-	const tags = form.value.tagsInput
-		? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
-		: [];
-	if (dialogMode.value === 'create') {
-		tasks.value.push({
-			id: Date.now(),
-			title: form.value.title,
-			planDate: planDateStr,
-			dueDate: dueDateStr,
-			priority: form.value.priority,
-			tags,
-			postponeCount: 0,
-			notes: form.value.notes,
-			subtasks: form.value.subtasks.map(sub => ({ ...sub })),
-			progress: 0,
-			status: 'not-started'
-		});
-	} else if (dialogMode.value === 'edit') {
-		const idx = tasks.value.findIndex(t => t.id === editId.value);
-		if (idx !== -1) {
-			tasks.value[idx] = {
-				...tasks.value[idx],
-				title: form.value.title,
+	try {
+		let taskId;
+		if (dialogMode.value === 'create') {
+			taskId = Date.now();
+		} else {
+			taskId = edtiTd.value;
+		}
+
+		await saveSubTasks(taskId, form.value.subtasks);
+		
+		const planDateStr = formatDateObjToStr(form.value.planDate);
+		const dueDateStr = formatDateObjToStr(form.value.dueDate);
+		const tags = form.value.tagsInput
+			? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+			: [];
+		if (dialogMode.value === 'create') {
+			tasks.value.push({
+				id: Date.now(),
+				title: form.value.title.trim(),
 				planDate: planDateStr,
 				dueDate: dueDateStr,
 				priority: form.value.priority,
 				tags,
-				notes: form.value.notes,
-				subtasks: form.value.subtasks.map(sub => ({ ...sub }))
-			};
+				postponeCount: 0,
+				notes: form.value.notes?.trim() || '',
+				subtasks: form.value.subtasks.map(sub => ({ ...sub })),
+				progress: 0,
+				status: 'not-started'
+			});
+		} else if (dialogMode.value === 'edit') {
+			const idx = tasks.value.findIndex(t => t.id === editId.value);
+			if (idx !== -1) {
+				tasks.value[idx] = {
+					...tasks.value[idx],
+					title: form.value.title.trim(),
+					planDate: planDateStr,
+					dueDate: dueDateStr,
+					priority: form.value.priority,
+					tags,
+					notes: form.value.notes?.trim() || '',
+					subtasks: form.value.subtasks.map(sub => ({ ...sub }))
+				};
+			}
 		}
+		showDialog.value = false;
+	} catch (error) {
+		console.error('Fail to save:', error);
+		alert('Partial saving failed. Please check the data.');
 	}
-	showDialog.value = false;
 }
 
+// 子事项相关
+async function saveSubTasks(taskId, subtasks) {
+  try {
+    const { data } = await axios.put(`/api/tasks/${taskId}/subtasks`, {
+      subtasks: subtasks.map(s => ({
+        id: s.id || undefined, // 新建项不带id
+        title: s.title.trim()
+      }))
+    });
+    
+    // 关键：将返回的子任务数据同步到本地表单
+    form.value.subtasks = data.map(sub => ({
+      id: sub.id,
+      title: sub.title,
+      completed: sub.completed || false // 保留勾选状态
+    }));
+  } catch (error) {
+    throw new Error('Subtask fail to save: ' + error.message);
+  }
+}
 // 修复标记完成问题（务必用id查找原tasks对象）
 function markCompleted(id) {
 	const idx = tasks.value.findIndex(t => t.id === id);
