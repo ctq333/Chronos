@@ -30,8 +30,8 @@ def create_app():
     app.register_blueprint(schedule_routes)
 
     # Register subtask bluprint
-    from app.routes.subtask_routes import subtask_bp
-    app.register_blueprint(subtask_bp)
+    from app.routes.subtask_routes import task_subtask_bp
+    app.register_blueprint(task_subtask_bp)
 
 
     # CORS configuration
