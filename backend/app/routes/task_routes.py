@@ -258,6 +258,37 @@ def update_task_progress(current_user, task_id):
     db.session.commit()
     return jsonify({'code': 200, 'message': '进度已更新', 'data': {'progress': task.progress, 'status': task.status}})
 
+@bp.route('/<int:task_id>/postpone', methods=['POST'])
+@login_required()
+def postpone_task(current_user, task_id):
+    data = request.get_json()
+    new_plan_date_str = data.get('newPlanDate')
+    if not new_plan_date_str:
+        return jsonify({'code': 400, 'message': '新计划日期不能为空'}), 400
+
+    try:
+        new_plan_date = datetime.strptime(new_plan_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({'code': 400, 'message': '日期格式错误'}), 400
+
+    task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return jsonify({'code': 404, 'message': '事项不存在或无权限'}), 404
+
+    task.plan_date = new_plan_date
+    task.postpone_count = (task.postpone_count or 0) + 1
+
+    try:
+        db.session.commit()
+        return jsonify({'code': 200, 'message': '事项已推迟', 'data': {
+            'planDate': new_plan_date_str,
+            'postponeCount': task.postpone_count
+        }})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'code': 500, 'message': f'服务器错误: {str(e)}'}), 500
+
+
 @bp.route('/subtask/<int:subtask_id>/toggle_completed', methods=['POST'])
 @login_required()
 def toggle_subtask_completed(current_user, subtask_id):

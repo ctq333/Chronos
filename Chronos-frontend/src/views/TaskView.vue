@@ -158,7 +158,7 @@
 
 		<!-- 创建/编辑事项对话框（全功能: 子任务增删改） -->
 		<Dialog v-model:visible="showDialog" :header="dialogMode==='create'?'新建事项':'编辑事项'" :modal="true" :closable="false" :style="{width:'480px'}">
-			<form @submit.prevent="onSubmit">
+			<form @submit.prevent="dialogMode === 'create' ? onSubmit() : onEditSubmit()">
 				<div class="mb-3">
 					<label>标题 *</label>
 					<InputText v-model="form.title" maxlength="50" required class="w-full" />
@@ -206,7 +206,7 @@
 				</div>
 				<div class="flex justify-end gap-2">
 					<Button label="取消" icon="pi pi-times" severity="secondary" @click="showDialog=false" type="button" />
-					<Button :label="dialogMode==='create'?'创建':'保存'" icon="pi pi-check" type="submit" />
+					<Button :label="dialogMode==='create'?'创建':'保存修改'" icon="pi pi-check" type="submit" />
 				</div>
 			</form>
 		</Dialog>
@@ -574,48 +574,110 @@ function removeEditSubTask(idx) {
 	form.value.subtasks.splice(idx, 1);
 }
 
-function onSubmit() {
-	if (!form.value.title || !form.value.planDate || !form.value.dueDate) {
-		alert('请填写所有必填字段');
-		return;
-	}
-	const planDateStr = formatDateObjToStr(form.value.planDate);
-	const dueDateStr = formatDateObjToStr(form.value.dueDate);
-	const tags = form.value.tagsInput
-		? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
-		: [];
-	if (dialogMode.value === 'create') {
-		tasks.value.push({
-			id: Date.now(),
-			title: form.value.title,
-			planDate: planDateStr,
-			dueDate: dueDateStr,
-			priority: form.value.priority,
-			tags,
-			postponeCount: 0,
-			notes: form.value.notes,
-			subtasks: form.value.subtasks.map(sub => ({ ...sub })),
-			progress: 0,
-			status: 'not-started'
-		});
-	} else if (dialogMode.value === 'edit') {
-		const idx = tasks.value.findIndex(t => t.id === editId.value);
-		if (idx !== -1) {
-			tasks.value[idx] = {
-				...tasks.value[idx],
-				title: form.value.title,
-				planDate: planDateStr,
-				dueDate: dueDateStr,
-				priority: form.value.priority,
-				tags,
-				notes: form.value.notes,
-				subtasks: form.value.subtasks.map(sub => ({ ...sub }))
-			};
-		}
-	}
-	showDialog.value = false;
-}
+async function onSubmit() {
+  if (!form.value.title || !form.value.planDate || !form.value.dueDate) {
+    alert('请填写所有必填字段');
+    return;
+  }
 
+  // 1. 组装后端需要的数据
+  const planDateStr = formatDateObjToStr(form.value.planDate);
+  const dueDateStr = formatDateObjToStr(form.value.dueDate);
+  const tags = form.value.tagsInput
+    ? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+    : [];
+
+  const payload = {
+    title: form.value.title,
+    planDate: planDateStr,
+    dueDate: dueDateStr,
+    priority: form.value.priority,
+    notes: form.value.notes,
+    tags: tags,
+    subtasks: form.value.subtasks.map(sub => ({
+      title: sub.title,
+      completed: sub.completed
+    }))
+  };
+
+  try {
+    // 2. 调用后端API
+    const res = await axios.post(
+      '/api/task/create',  // 已由vite.config.js代理
+      payload,
+      {
+        headers: {
+          'Authorization': 'Bearer ' + store.state.token
+        }
+      }
+    );
+
+    if (res.data?.code === 201) {
+      // 3. 后端返回新任务id等，这里可以把新任务加到tasks.value
+      tasks.value.push({
+        id: res.data.data.id,
+        title: form.value.title,
+        planDate: planDateStr,
+        dueDate: dueDateStr,
+        priority: form.value.priority,
+        tags: tags,
+        postponeCount: 0,
+        notes: form.value.notes,
+        subtasks: form.value.subtasks.map(sub => ({ ...sub })),
+        progress: 0,
+        status: 'not-started'
+      });
+	  await fetchTasks();
+      showDialog.value = false;
+    } else {
+      alert(res.data?.message || '创建失败');
+    }
+  } catch (err) {
+    alert('网络/服务器错误：' + (err.response?.data?.message || err.message));
+  }
+}
+async function onEditSubmit() {
+  if (!form.value.title || !form.value.planDate || !form.value.dueDate) {
+    alert('请填写所有必填字段');
+    return;
+  }
+
+  const planDateStr = formatDateObjToStr(form.value.planDate);
+  const dueDateStr = formatDateObjToStr(form.value.dueDate);
+  const tags = form.value.tagsInput
+    ? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+    : [];
+
+  const payload = {
+    title: form.value.title,
+    planDate: planDateStr,
+    dueDate: dueDateStr,
+    priority: form.value.priority,
+    notes: form.value.notes,
+    tags: tags,
+    subtasks: form.value.subtasks.map(sub => ({
+      id: sub.id, // 编辑时需带id
+      title: sub.title,
+      completed: sub.completed
+    }))
+  };
+
+  try {
+    const res = await axios.post(
+      `/api/task/${editId.value}/update`,
+      payload,
+      { headers: { Authorization: "Bearer " + store.state.token } }
+    );
+    if (res.data.code === 200) {
+      await fetchTasks(); // 刷新列表
+      showDialog.value = false;
+    } else {
+      alert(res.data.message || "保存失败");
+    }
+  } catch (err) {
+    alert("网络/服务器错误：" + (err.response?.data?.message || err.message));
+  }
+}
 // 修复标记完成问题（务必用id查找原tasks对象）
 function markCompleted(id) {
 	const idx = tasks.value.findIndex(t => t.id === id);
@@ -633,17 +695,33 @@ function openPostponeDialog(task) {
 	postponeDate.value = new Date(task.planDate);
 	showPostponeDialog.value = true;
 }
-function onPostponeSubmit() {
-	if (!postponeDate.value) return;
-	const idx = tasks.value.findIndex(t => t.id === currentPostponeTaskId.value);
-	if (idx !== -1) {
-		const dateStr = formatDateObjToStr(postponeDate.value);
-		tasks.value[idx].planDate = dateStr;
-		tasks.value[idx].postponeCount = (tasks.value[idx].postponeCount || 0) + 1;
-	}
-	showPostponeDialog.value = false;
-}
+async function onPostponeSubmit() {
+  if (!postponeDate.value) return;
 
+  const idx = tasks.value.findIndex(t => t.id === currentPostponeTaskId.value);
+  if (idx === -1) return;
+
+  const dateStr = formatDateObjToStr(postponeDate.value);
+
+  try {
+    const res = await axios.post(
+      `/api/task/${currentPostponeTaskId.value}/postpone`,
+      { newPlanDate: dateStr },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+
+    if (res.data.code === 200) {
+      // 后端成功，更新前端任务数据
+      tasks.value[idx].planDate = dateStr;
+      tasks.value[idx].postponeCount = (tasks.value[idx].postponeCount || 0) + 1;
+      showPostponeDialog.value = false;
+    } else {
+      alert(res.data.message || '推迟失败');
+    }
+  } catch (error) {
+    alert('推迟请求失败: ' + (error.response?.data?.message || error.message));
+  }
+}
 const showAddSubTaskDialog = ref(false);
 const currentSubTaskParentId = ref(null);
 const subTaskTitle = ref('');
@@ -653,17 +731,37 @@ function openAddSubTaskDialog(task) {
 	subTaskTitle.value = '';
 	showAddSubTaskDialog.value = true;
 }
-function onAddSubTaskSubmit() {
-	if (!subTaskTitle.value) return;
-	const idx = tasks.value.findIndex(t => t.id === currentSubTaskParentId.value);
-	if (idx !== -1) {
-		tasks.value[idx].subtasks = tasks.value[idx].subtasks || [];
-		const newId = Date.now() + Math.random();
-		tasks.value[idx].subtasks.push({ id: newId, title: subTaskTitle.value, completed: false });
-	}
-	showAddSubTaskDialog.value = false;
+async function onAddSubTaskSubmit() {
+    if (!subTaskTitle.value.trim()) return
+    try {
+        const res = await axios.post(
+            `/api/task/${currentSubTaskParentId.value}/add_subtask`,
+            {
+                title: subTaskTitle.value.trim(),
+                completed: false  // 默认新子任务未完成
+            },
+            { headers: { Authorization: 'Bearer ' + store.state.token } }
+        )
+        if (res.data.code === 201) {
+            // 更新前端数据：找到该任务，push新子任务（带后端id）
+            const idx = tasks.value.findIndex(t => t.id === currentSubTaskParentId.value)
+            if (idx !== -1) {
+                tasks.value[idx].subtasks = tasks.value[idx].subtasks || []
+                // 用后端返回的真实id
+                tasks.value[idx].subtasks.push({
+                    id: res.data.data.id,
+                    title: res.data.data.title,
+                    completed: res.data.data.completed
+                })
+            }
+            showAddSubTaskDialog.value = false
+        } else {
+            alert(res.data.message || '添加失败')
+        }
+    } catch (err) {
+        alert('网络/服务器错误：' + (err.response?.data?.message || err.message))
+    }
 }
-
 
 const showSmartSubTaskDialog = ref(false);
 const currentSmartSubTaskParentId = ref(null);
