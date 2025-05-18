@@ -541,7 +541,7 @@ function removeEditSubTask(idx) {
 	form.value.subtasks.splice(idx, 1);
 }
 
-function onSubmit() {
+async function onSubmit() {
 	if (!form.value.title || !form.value.planDate || !form.value.dueDate) {
 		alert('请填写所有必填字段');
 		return;
@@ -654,16 +654,35 @@ function openAddSubTaskDialog(task) {
 	subTaskTitle.value = '';
 	showAddSubTaskDialog.value = true;
 }
-function onAddSubTaskSubmit() {
-	if (!subTaskTitle.value) return;
-	const idx = tasks.value.findIndex(t => t.id === currentSubTaskParentId.value);
-	if (idx !== -1) {
-		tasks.value[idx].subtasks = tasks.value[idx].subtasks || [];
-		const newId = Date.now() + Math.random();
-		tasks.value[idx].subtasks.push({ id: newId, title: subTaskTitle.value, completed: false });
+async function onAddSubTaskSubmit() {
+	if (!subTaskTitle.value.trim()) {
+		alert('请输入子任务标题');
+		return;
 	}
-	showAddSubTaskDialog.value = false;
+
+	try {
+		// 调用后端接口，传当前任务 ID 和子任务标题
+		const response = await axios.post(`/api/tasks/${currentSubTaskParentId.value}/subtasks`, {
+			title: subTaskTitle.value.trim()
+		});
+
+		const newSubtask = response.data; // 假设后端返回的是刚创建的子任务
+
+		// 找到前端任务列表中对应任务，插入新子任务
+		const idx = tasks.value.findIndex(t => t.id === currentSubTaskParentId.value);
+		if (idx !== -1) {
+			tasks.value[idx].subtasks = tasks.value[idx].subtasks || [];
+			tasks.value[idx].subtasks.push(newSubtask);
+		}
+
+		showAddSubTaskDialog.value = false;
+		subTaskTitle.value = '';
+	} catch (error) {
+		console.error('子任务创建失败:', error);
+		alert('子任务创建失败，请稍后重试');
+	}
 }
+
 
 const showSmartSubTaskDialog = ref(false);
 const currentSmartSubTaskParentId = ref(null);
