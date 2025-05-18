@@ -264,7 +264,7 @@
   </template>
   
   <script setup>
-  import { ref, computed, onMounted } from 'vue';
+  import { ref, computed, onMounted, watch } from 'vue';
   import Button from 'primevue/button';
   import SelectButton from 'primevue/selectbutton';
   import Dialog from 'primevue/dialog';
@@ -273,41 +273,20 @@
   import Textarea from 'primevue/textarea';
   import Card from 'primevue/card';
   import Timeline from 'primevue/timeline';
+  import axios from 'axios';
   
   const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
   
-  const schedules = ref([
-    {
-      id: 1,
-      title: '会议',
-      start: '2025-04-19T09:00',
-      end: '2025-04-19T10:00',
-      location: '会议室A',
-      description: '项目讨论',
-      link: 'https://meeting.com/123'
-    },
-    {
-      id: 2,
-      title: '医生预约',
-      start: '2025-04-19T14:30',
-      end: '2025-04-19T15:00',
-      location: '医院',
-      description: '',
-      link: ''
-    }
-  ]);
-  
+  const schedules = ref([]);
+  const dateRange = ref([]);     // 修正后的日期范围初始化
   const viewMode = ref('list');
   const viewModes = [
     { label: '列表', value: 'list', icon: 'pi pi-list' },
     { label: '日历', value: 'calendar', icon: 'pi pi-calendar' }
   ];
-  
-  // 修正后的日期范围初始化
-  const dateRange = ref([]);
 
   // 设置默认日期范围的函数
-  function setDefaultDateRange() {
+  function getDefaultDateRange() {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // 清除时间部分
     
@@ -315,50 +294,87 @@
     endDate.setDate(today.getDate() + 7); // 7天后
     endDate.setHours(23, 59, 59, 999); // 包含完整的一天
     
-    dateRange.value = [today, endDate];
+    return [today, endDate];
   }
 
-  // 在组件挂载时设置默认范围
-  onMounted(() => {
-    setDefaultDateRange();
-  });
+  // 获取日程数据
+  async function fetchSchedules(start, end) {
+    try {
+      // 始终携带日期范围参数
+      const params = {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+      }
+      
+      const res = await axios.get(`${BACKEND_PATH}/schedules`, { params })
+      schedules.value = res.data
+    } catch (err) {
+      console.error('获取日程失败:', err)
+      // 实际项目中这里应该添加用户提示
+    }
+  }
 
+  // 初始化
+  onMounted(() => {
+    // 设置默认日期范围
+    dateRange.value = getDefaultDateRange()
+    // 首次加载使用默认范围
+    fetchSchedules(...dateRange.value)
+  })
+
+  // 监听日期范围变化
+  watch(dateRange, (newVal) => {
+    if (newVal && newVal.length === 2) {
+      fetchSchedules(newVal[0], newVal[1])
+    }
+  })
+
+  // const filteredSchedules = computed(() => {
+  //   // 如果没有选择任何日期，返回所有日程
+  //   if (!dateRange.value || dateRange.value.length === 0) {
+  //     return schedules.value;
+  //   }
+  //   const [startDate, endDate] = dateRange.value;
+  //   // 如果只选择了开始日期（endDate为null或undefined）
+  //   if (!endDate) {
+  //     return schedules.value.filter(event => {
+  //       if (!event.start) return false;
+  //       const eventDate = new Date(event.start.split('T')[0]);
+  //       return eventDate >= startDate;
+  //     });
+  //   }
+  //   // 正常日期范围筛选
+  //   return schedules.value.filter(event => {
+  //     if (!event.start) return false;
+  //     const eventStartDate = new Date(event.start.split('T')[0]);
+  //     const eventEndDate = event.end ? new Date(event.end.split('T')[0]) : eventStartDate;
+  //     return (
+  //       (eventStartDate >= startDate && eventStartDate <= endDate) || 
+  //       (eventEndDate >= startDate && eventEndDate <= endDate) ||
+  //       (eventStartDate <= startDate && eventEndDate >= endDate)
+  //     );
+  //   });
+  // });
   const filteredSchedules = computed(() => {
-    // 如果没有选择任何日期，返回所有日程
-    if (!dateRange.value || dateRange.value.length === 0) {
-      return schedules.value;
-    }
-    const [startDate, endDate] = dateRange.value;
-    // 如果只选择了开始日期（endDate为null或undefined）
-    if (!endDate) {
-      return schedules.value.filter(event => {
-        if (!event.start) return false;
-        const eventDate = new Date(event.start.split('T')[0]);
-        return eventDate >= startDate;
-      });
-    }
-    // 正常日期范围筛选
-    return schedules.value.filter(event => {
-      if (!event.start) return false;
-      const eventStartDate = new Date(event.start.split('T')[0]);
-      const eventEndDate = event.end ? new Date(event.end.split('T')[0]) : eventStartDate;
-      return (
-        (eventStartDate >= startDate && eventStartDate <= endDate) || 
-        (eventEndDate >= startDate && eventEndDate <= endDate) ||
-        (eventStartDate <= startDate && eventEndDate >= endDate)
-      );
-    });
-  });
+    return schedules.value
+  })
 
   const selectedDate = ref(new Date());
   
+  // const filteredEvents = computed(() => {
+  //   const y = selectedDate.value.getFullYear();
+  //   const m = (selectedDate.value.getMonth() + 1).toString().padStart(2, '0');
+  //   const d = selectedDate.value.getDate().toString().padStart(2, '0');
+  //   const dateStr = `${y}-${m}-${d}`;
+  //   return schedules.value.filter(ev => (ev.start && ev.start.startsWith(dateStr)));
+  // });
   const filteredEvents = computed(() => {
-    const y = selectedDate.value.getFullYear();
-    const m = (selectedDate.value.getMonth() + 1).toString().padStart(2, '0');
-    const d = selectedDate.value.getDate().toString().padStart(2, '0');
-    const dateStr = `${y}-${m}-${d}`;
-    return schedules.value.filter(ev => (ev.start && ev.start.startsWith(dateStr)));
-  });
+    if (!selectedDate.value) return []
+    const dateStr = selectedDate.value.toISOString().split('T')[0]
+    return schedules.value.filter(ev => 
+      ev.start && ev.start.startsWith(dateStr)
+    )
+  })
   
   const timelineEvents = computed(() =>
     filteredEvents.value

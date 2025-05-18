@@ -59,12 +59,11 @@
   <script setup>
   import { ref } from 'vue'
   import { useRouter } from 'vue-router'
+  import store from '@/store'
   import InputText from 'primevue/inputtext'
   import Password from 'primevue/password'
   import Button from 'primevue/button'
-  import axios from 'axios'
-  
-
+  import request from '@/utils/request'
   
   const account = ref('')
   const password = ref('')
@@ -73,43 +72,40 @@
   const inputError = ref(false)
   
   const router = useRouter()
-  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH
   
-  function onBtnLoginClick() {
+  async function onBtnLoginClick() {
     loginError.value = ''
     inputError.value = false
+
     if (!account.value || !password.value) {
         loginError.value = '请输入用户名和密码'
         inputError.value = true
         return
     }
+
     loading.value = true
-    axios
-        .get(`${BACKEND_PATH}/login?username=${encodeURIComponent(account.value)}&password=${encodeURIComponent(password.value)}`)
-        .then(response => {
-        if (response.data.length > 0) {
-            const userInfo = response.data[0]
-            // 判断账户状态
-            if (userInfo.status && userInfo.status !== 'active') {
-            // 你可以根据后端返回的禁用状态调整条件
-            loginError.value = '账户已被管理员禁用，请联系管理员'
-            return
-            }
-            sessionStorage.setItem('uuid', userInfo.uuid)
-            sessionStorage.setItem('accessToken', userInfo.accessToken)
-            sessionStorage.setItem('isLoggedIn', true)
-            router.push({ path: '/' }).then(() => window.location.reload())
-        } else {
-            loginError.value = '登录失败：用户不存在或密码错误'
-        }
-        })
-        .catch(() => {
-        loginError.value = '登录失败：服务器连接异常'
-        })
-        .finally(() => {
-        loading.value = false
-        })
+    try {
+      const response = await request.post('/auth/login', {
+        username: account.value,
+        password: password.value
+      })
+      if (response.data.code === 200) {
+        store.commit('SET_USER',response.data.data.user)
+        store.commit('SET_TOKEN',response.data.data.token)
+        router.push('/')
+      } else {
+        loginError.value = `登录失败: ${response.data.message}`
+      }
+    } catch (error) {
+      if (error.response) {
+        loginError.value = error.response.data.message || '服务器错误'
+      } else {
+        loginError.value = error.message
+      }
+    } finally {
+      loading.value = false
     }
+  }
   </script>
   
   <style scoped>

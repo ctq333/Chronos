@@ -65,7 +65,7 @@
   import InputText from 'primevue/inputtext'
   import Password from 'primevue/password'
   import Button from 'primevue/button'
-  import axios from 'axios'
+  import request from '@/utils/request'
   
   const account = ref('')
   const password = ref('')
@@ -88,23 +88,23 @@
     }
     loading.value = true
     try {
-      const response = await axios.post(`${BACKEND_PATH}/register`, {
+      const response = await request.post('/auth/register', {
         username: account.value,
         password: password.value
       })
-      if (response.data.error) {
-        regError.value = '注册失败: ' + response.data.error
-      } else {
+      if (response.data.code === 201) {
         regSuccess.value = '注册成功，正在跳转登录...'
         setTimeout(() => {
           router.push({ name: 'login' })
         }, 1000)
+      } else {
+        regError.value = `注册失败: ${response.data.message}`
       }
     } catch (error) {
-      if (error.response && error.response.data.error) {
-        regError.value = '注册失败: ' + error.response.data.error
+      if (error.response) {
+        loginError.value = error.response.data.message || '服务器错误'
       } else {
-        regError.value = '注册失败: 发生未知错误'
+        loginError.value = error.message
       }
     } finally {
       loading.value = false

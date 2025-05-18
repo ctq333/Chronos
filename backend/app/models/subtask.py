@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models import Base
+=======
+from app import db
+>>>>>>> bc01a6e07acce1995235be4dc2eaa8d1131ad045
 
 class SubTask(Base):
     __tablename__ = 'subtask'

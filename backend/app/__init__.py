@@ -1,5 +1,4 @@
 from flask import Flask
-from app.routes import llm_routes, admin_routes, auth_routes, task_routes, schedule_routes
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import os
@@ -18,7 +17,12 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
-    # Register blueprints
+
+    # 在初始化 db 之后，再导入模型和蓝图，避免循环导入
+    from app.models import User, Schedule, Task, ScheduleInvitation, SubTask, Report
+
+    # Register blueprints (导入蓝图对象并注册)
+    from app.routes import llm_routes, admin_routes, auth_routes, task_routes, schedule_routes
     app.register_blueprint(llm_routes)
     app.register_blueprint(admin_routes)
     app.register_blueprint(auth_routes)

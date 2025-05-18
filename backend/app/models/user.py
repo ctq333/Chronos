@@ -1,4 +1,4 @@
-from .. import db
+from app import db
 
 class User(db.Model):
     __tablename__ = "user"
@@ -11,6 +11,8 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     is_admin = db.Column(db.SmallInteger, default=0)
+    token = db.Column(db.String(255), default=None)
+    token_expires_at = db.Column(db.DateTime, default=None)
 
     # Relationships
     schedules = db.relationship('Schedule', backref='user', cascade="all, delete-orphan", lazy=True)
