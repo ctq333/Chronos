@@ -76,6 +76,7 @@
                                 size="70"
                                 :model-value=event.progress
 								valueTemplate="{value}%"
+								@update:model-value="val => onProgressChange(event, val)"
                             />
 							</div>
                         </div>
@@ -110,6 +111,7 @@
                                         v-model="subtask.completed"
                                         :binary="true"
                                         class="h-4 w-4"
+										@change="onSubTaskToggle(event.id, subtask)"
                                     />
                                     <label 
                                         class="ml-2 text-sm cursor-pointer"
@@ -154,7 +156,60 @@
 			</div>
 		</div>
 
-
+		<!-- 创建/编辑事项对话框（全功能: 子任务增删改） -->
+		<Dialog v-model:visible="showDialog" :header="dialogMode==='create'?'新建事项':'编辑事项'" :modal="true" :closable="false" :style="{width:'480px'}">
+			<form @submit.prevent="onSubmit">
+				<div class="mb-3">
+					<label>标题 *</label>
+					<InputText v-model="form.title" maxlength="50" required class="w-full" />
+				</div>
+				<div class="mb-3 flex gap-2">
+					<div class="flex-1">
+						<label>计划处理日期 *</label>
+						<Calendar v-model="form.planDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
+					</div>
+					<div class="flex-1">
+						<label>截止日期 *</label>
+						<Calendar v-model="form.dueDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
+					</div>
+				</div>
+				<div class="mb-3">
+					<label>优先级</label>
+					<SelectButton 
+						v-model="form.priority"
+						:options="priorityOptions"
+						optionLabel="label"
+						optionValue="value"
+						class="w-full"
+					/>
+				</div>
+				<div class="mb-3">
+					<label>标签（逗号分隔）</label>
+					<InputText v-model="form.tagsInput" placeholder="如：设计,前端,项目" class="w-full" />
+				</div>
+				<div class="mb-3">
+					<label>备注</label>
+					<Textarea v-model="form.notes" maxlength="200" rows="3" class="w-full" />
+				</div>
+				<!-- 子任务编辑区 -->
+				<div class="mb-3">
+					<label class="block mb-1">子任务</label>
+					<div v-for="(sub, idx) in form.subtasks" :key="sub.id" class="flex items-center gap-2 mb-2">
+						<Checkbox v-model="sub.completed" :binary="true" />
+						<InputText v-model="sub.title" placeholder="子任务标题" class="flex-1" />
+						<Button icon="pi pi-trash" text severity="danger" @click="removeEditSubTask(idx)" />
+					</div>
+					<div class="flex gap-2 mt-1">
+						<InputText v-model="newSubTaskTitle" placeholder="新增子任务标题" class="flex-1" @keyup.enter="addEditSubTask" />
+						<Button icon="pi pi-plus" label="添加" class="p-button-sm" @click="addEditSubTask" :disabled="!newSubTaskTitle.trim()" />
+					</div>
+				</div>
+				<div class="flex justify-end gap-2">
+					<Button label="取消" icon="pi pi-times" severity="secondary" @click="showDialog=false" type="button" />
+					<Button :label="dialogMode==='create'?'创建':'保存'" icon="pi pi-check" type="submit" />
+				</div>
+			</form>
+		</Dialog>
 
 		<!-- 智能事项批量创建对话框 -->
 		<Dialog v-model:visible="showLLMDialog" header="LLM智能创建事项" modal style="width: 700px">
@@ -321,7 +376,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import Button from 'primevue/button';
 import SelectButton from 'primevue/selectbutton';
 import Dialog from 'primevue/dialog';
@@ -332,6 +387,9 @@ import Card from 'primevue/card';
 import Knob from 'primevue/knob';
 import Tag from 'primevue/tag';
 import Checkbox from 'primevue/checkbox';
+import axios from 'axios';
+import { useStore } from 'vuex'
+const store = useStore()
 
 const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
 
@@ -346,54 +404,29 @@ const priorityOptions = [
 	{ label: '紧急', value: 4 }
 ];
 
-const tasks = ref([
-  {
-    id: 1,
-    title: '完成项目原型设计',
-    planDate: '2025-05-10',
-    dueDate: '2025-05-15',
-    priority: 3,
-    tags: ['设计', '前端', '项目'],
-    postponeCount: 0,
-    notes: '需要与UI团队确认设计规范后再开始',
-    subtasks: [
-      { id: 101, title: '收集设计需求', completed: true },
-      { id: 102, title: '创建线框图', completed: false },
-      { id: 103, title: '制作交互原型', completed: false }
-    ],
-    progress: 33,
-    status: 'in-progress'
-  },
-  {
-    id: 2,
-    title: '准备季度汇报',
-    planDate: '2025-04-25',
-    dueDate: '2025-04-30',
-    priority: 2,
-    tags: ['汇报', '管理'],
-    postponeCount: 2,
-    notes: '需要包含Q1成果和Q2计划',
-    subtasks: [
-      { id: 201, title: '收集各部门数据', completed: true },
-      { id: 202, title: '制作PPT', completed: false }
-    ],
-    progress: 50,
-    status: 'in-progress'
-  },
-  {
-    id: 3,
-    title: '团队建设活动',
-    planDate: '2025-05-15',
-    dueDate: '2025-05-20',
-    priority: 1,
-    tags: ['团建', '休闲'],
-    postponeCount: 0,
-    notes: '地点待定，预算5000元',
-    subtasks: [],
-    progress: 0,
-    status: 'not-started'
+const tasks = ref([])
+
+async function fetchTasks() {
+  try {
+    const res = await axios.get('/api/task/list', {
+      headers: {
+        'Authorization': 'Bearer ' + store.state.token
+      }
+    })
+    if (res.data.code === 200) {
+      tasks.value = res.data.data.tasks
+    } else {
+      alert(res.data.message || '获取事项失败')
+    }
+  } catch (err) {
+    alert('获取事项错误: ' + (err.response?.data?.message || err.message))
   }
-]);
+}
+
+// 在页面挂载时获取
+onMounted(() => {
+  fetchTasks()
+})
 
 function getRemainingDays(dueDate) {
 	const now = new Date();
@@ -531,7 +564,7 @@ function addEditSubTask() {
 	const title = newSubTaskTitle.value.trim();
 	if (!title) return;
 	form.value.subtasks.push({
-		id: Date.now() + Math.random(),
+		//id: Date.now() + Math.random(),
 		title,
 		completed: false
 	});
@@ -541,82 +574,48 @@ function removeEditSubTask(idx) {
 	form.value.subtasks.splice(idx, 1);
 }
 
-async function onSubmit() {
+function onSubmit() {
 	if (!form.value.title || !form.value.planDate || !form.value.dueDate) {
 		alert('请填写所有必填字段');
 		return;
 	}
-	try {
-		let taskId;
-		if (dialogMode.value === 'create') {
-			taskId = Date.now();
-		} else {
-			taskId = edtiTd.value;
-		}
-
-		await saveSubTasks(taskId, form.value.subtasks);
-		
-		const planDateStr = formatDateObjToStr(form.value.planDate);
-		const dueDateStr = formatDateObjToStr(form.value.dueDate);
-		const tags = form.value.tagsInput
-			? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
-			: [];
-		if (dialogMode.value === 'create') {
-			tasks.value.push({
-				id: Date.now(),
-				title: form.value.title.trim(),
+	const planDateStr = formatDateObjToStr(form.value.planDate);
+	const dueDateStr = formatDateObjToStr(form.value.dueDate);
+	const tags = form.value.tagsInput
+		? form.value.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+		: [];
+	if (dialogMode.value === 'create') {
+		tasks.value.push({
+			id: Date.now(),
+			title: form.value.title,
+			planDate: planDateStr,
+			dueDate: dueDateStr,
+			priority: form.value.priority,
+			tags,
+			postponeCount: 0,
+			notes: form.value.notes,
+			subtasks: form.value.subtasks.map(sub => ({ ...sub })),
+			progress: 0,
+			status: 'not-started'
+		});
+	} else if (dialogMode.value === 'edit') {
+		const idx = tasks.value.findIndex(t => t.id === editId.value);
+		if (idx !== -1) {
+			tasks.value[idx] = {
+				...tasks.value[idx],
+				title: form.value.title,
 				planDate: planDateStr,
 				dueDate: dueDateStr,
 				priority: form.value.priority,
 				tags,
-				postponeCount: 0,
-				notes: form.value.notes?.trim() || '',
-				subtasks: form.value.subtasks.map(sub => ({ ...sub })),
-				progress: 0,
-				status: 'not-started'
-			});
-		} else if (dialogMode.value === 'edit') {
-			const idx = tasks.value.findIndex(t => t.id === editId.value);
-			if (idx !== -1) {
-				tasks.value[idx] = {
-					...tasks.value[idx],
-					title: form.value.title.trim(),
-					planDate: planDateStr,
-					dueDate: dueDateStr,
-					priority: form.value.priority,
-					tags,
-					notes: form.value.notes?.trim() || '',
-					subtasks: form.value.subtasks.map(sub => ({ ...sub }))
-				};
-			}
+				notes: form.value.notes,
+				subtasks: form.value.subtasks.map(sub => ({ ...sub }))
+			};
 		}
-		showDialog.value = false;
-	} catch (error) {
-		console.error('Fail to save:', error);
-		alert('Partial saving failed. Please check the data.');
 	}
+	showDialog.value = false;
 }
 
-// 子事项相关
-async function saveSubTasks(taskId, subtasks) {
-  try {
-    const { data } = await axios.put(`/api/tasks/${taskId}/subtasks`, {
-      subtasks: subtasks.map(s => ({
-        id: s.id || undefined, // 新建项不带id
-        title: s.title.trim()
-      }))
-    });
-    
-    // 关键：将返回的子任务数据同步到本地表单
-    form.value.subtasks = data.map(sub => ({
-      id: sub.id,
-      title: sub.title,
-      completed: sub.completed || false // 保留勾选状态
-    }));
-  } catch (error) {
-    throw new Error('Subtask fail to save: ' + error.message);
-  }
-}
 // 修复标记完成问题（务必用id查找原tasks对象）
 function markCompleted(id) {
 	const idx = tasks.value.findIndex(t => t.id === id);
@@ -654,33 +653,15 @@ function openAddSubTaskDialog(task) {
 	subTaskTitle.value = '';
 	showAddSubTaskDialog.value = true;
 }
-async function onAddSubTaskSubmit() {
-	if (!subTaskTitle.value.trim()) {
-		alert('请输入子任务标题');
-		return;
+function onAddSubTaskSubmit() {
+	if (!subTaskTitle.value) return;
+	const idx = tasks.value.findIndex(t => t.id === currentSubTaskParentId.value);
+	if (idx !== -1) {
+		tasks.value[idx].subtasks = tasks.value[idx].subtasks || [];
+		const newId = Date.now() + Math.random();
+		tasks.value[idx].subtasks.push({ id: newId, title: subTaskTitle.value, completed: false });
 	}
-
-	try {
-		// 调用后端接口，传当前任务 ID 和子任务标题
-		const response = await axios.post(`/api/tasks/${currentSubTaskParentId.value}/subtasks`, {
-			title: subTaskTitle.value.trim()
-		});
-
-		const newSubtask = response.data; // 假设后端返回的是刚创建的子任务
-
-		// 找到前端任务列表中对应任务，插入新子任务
-		const idx = tasks.value.findIndex(t => t.id === currentSubTaskParentId.value);
-		if (idx !== -1) {
-			tasks.value[idx].subtasks = tasks.value[idx].subtasks || [];
-			tasks.value[idx].subtasks.push(newSubtask);
-		}
-
-		showAddSubTaskDialog.value = false;
-		subTaskTitle.value = '';
-	} catch (error) {
-		console.error('子任务创建失败:', error);
-		alert('子任务创建失败，请稍后重试');
-	}
+	showAddSubTaskDialog.value = false;
 }
 
 
@@ -777,22 +758,31 @@ function confirmLLMSchedules() {
 	}
 	showLLMDialog.value = false;
 }
-function confirmDelete(row) {
-	if (confirm(`确定要删除"${row.title}"?`)) {
-		tasks.value = tasks.value.filter(t => t.id !== row.id);
-	}
+async function confirmDelete(row) {
+  if (!confirm(`确定要删除"${row.title}"?`)) return;
+  try {
+    const res = await axios.delete(`/api/task/${row.id}/delete`, {
+      headers: { 'Authorization': 'Bearer ' + store.state.token }
+    });
+    if (res.data.code === 200) {
+      await fetchTasks(); // 刷新事项列表
+    } else {
+      alert(res.data.message || '删除失败');
+    }
+  } catch (err) {
+    alert('删除失败: ' + (err.response?.data?.message || err.message));
+  }
 }
 
-function toggleCompleted(id) {
-	const idx = tasks.value.findIndex(t => t.id === id);
-	if (idx !== -1) {
-		if (tasks.value[idx].status === 'completed') {
-			tasks.value[idx].status = 'in-progress';
-			// 可自定义设置：tasks.value[idx].progress = 0;
-		} else {
-			tasks.value[idx].status = 'completed';
-		}
-	}
+async function toggleCompleted(taskId) {
+  const res = await axios.post(`/api/task/${taskId}/toggle_complete`, {}, {
+    headers: { 'Authorization': 'Bearer ' + store.state.token }
+  });
+  if (res.data.code === 200) {
+    await fetchTasks(); // 刷新任务列表
+  } else {
+    alert(res.data.message || '操作失败');
+  }
 }
 
 // 日程对话框相关
@@ -841,6 +831,61 @@ function onScheduleSubmit() {
     description: f.description
   });
   showScheduleDialog.value = false;
+}
+
+// 用于防抖（可选）
+const progressTimers = {}
+
+function onProgressChange(event, newVal) {
+  // 立即更新本地数据（更流畅体验）
+  event.progress = newVal
+
+  // 防抖：短时间只同步一次
+  if (progressTimers[event.id]) clearTimeout(progressTimers[event.id])
+  progressTimers[event.id] = setTimeout(() => {
+    updateTaskProgress(event.id, newVal)
+  }, 400)
+}
+
+async function updateTaskProgress(taskId, progress) {
+  try {
+    const res = await axios.post(
+      `/api/task/${taskId}/progress`,
+      { progress },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    )
+    if (res.data.code !== 200) {
+      alert(res.data.message || '进度更新失败')
+    }
+    // 可根据后端返回再刷新 tasks 或者只更新本地 event.status
+  } catch (err) {
+    alert('进度同步失败: ' + (err.response?.data?.message || err.message))
+  }
+}
+
+async function onSubTaskToggle(parentTaskId, subtask) {
+  // 立即本地显示（可选，体验更好）
+  subtask.completed = !subtask.completed;
+
+  try {
+    const res = await axios.post(
+      `/api/task/subtask/${subtask.id}/toggle_completed`,
+      {},  // toggle接口无需payload
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+    if (res.data.code === 200) {
+      // 用后端返回的最终 completed 状态覆盖本地
+      subtask.completed = res.data.data.completed;
+    } else {
+      alert(res.data.message || '子任务同步失败');
+      // 请求失败，回滚本地
+      subtask.completed = !subtask.completed;
+    }
+  } catch (err) {
+    alert('子任务同步失败: ' + (err.response?.data?.message || err.message));
+    // 网络失败，回滚本地
+    subtask.completed = !subtask.completed;
+  }
 }
 </script>
 <style scoped>
