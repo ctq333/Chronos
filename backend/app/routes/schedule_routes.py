@@ -166,3 +166,48 @@ def invite(user):
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "msg": "邀请发送失败"}), 500
+    
+@bp.route('/batch_create', methods=['POST'])
+@login_required()
+def batch_create(current_user):
+    db = current_app.extensions["sqlalchemy"]
+    data = request.get_json()
+    schedules = data.get("schedules", [])
+    created = []
+    for s in schedules:
+        title = s.get("title", "").strip()
+        description = s.get("description", "")
+        start = s.get("start")
+        end = s.get("end")
+        location = s.get("location", "")
+        link = s.get("link", "")
+
+        # 时间格式校验
+        if not title or not start or not end:
+            continue
+
+        start_dt = datetime.strptime(start, "%Y-%m-%dT%H:%M")
+        end_dt = datetime.strptime(end, "%Y-%m-%dT%H:%M")
+
+        schedule = Schedule(
+            user_id=current_user.id,
+            title=title,
+            description=description,
+            start_time=start_dt,
+            end_time=end_dt,
+            location=location,
+            link=link
+        )
+        db.session.add(schedule)
+        db.session.flush()
+        created.append({
+            "id": schedule.id,
+            "title": schedule.title,
+            "start": start,
+            "end": end,
+            "location": schedule.location,
+            "link": schedule.link,
+            "description": schedule.description,
+        })
+    db.session.commit()
+    return jsonify({"code": 201, "data": created, "message": "批量日程创建成功"})

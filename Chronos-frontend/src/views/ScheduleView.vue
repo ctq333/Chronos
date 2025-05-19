@@ -618,54 +618,110 @@ function openLLMDialog() {
   llmResults.value = [];
 }
 
-// 模拟 LLM 返回多个日程，包含结束时间与链接
-function handleLLMCreate() {
-  // 真实情况请替换为 LLM API 调用
-  // 给每个日程加唯一 _uid（便于渲染 key）
-  llmResults.value = [
-    {
-      _uid: Math.random().toString(36).slice(2),
-      title: '看牙医',
-      start_date: '2025-04-19',
-      start_time: '15:00',
-      end_date: '2025-04-19',
-      end_time: '16:00',
-      location: '医院',
-      link: 'https://meet.example.com/dental',
-      description: '牙科预约'
-    },
-    {
-      _uid: Math.random().toString(36).slice(2),
-      title: '和朋友吃饭',
-      start_date: '2025-04-19',
-      start_time: '19:00',
-      end_date: '2025-04-19',
-      end_time: '21:00',
-      location: '餐厅',
-      link: '',
-      description: '聚餐'
+async function handleLLMCreate() {
+  if (!llmInput.value.trim()) {
+    toast.add({
+      severity: 'warn',
+      summary: '警告',
+      detail: '请输入自然语言描述',
+      life: 3000
+    });
+    return;
+  }
+  try {
+    llmResults.value = [];
+    const res = await request.post('/llm/createSchedule', {
+      paragraph: llmInput.value
+    });
+    if (Array.isArray(res.data)) {
+      llmResults.value = res.data.map(item => ({
+        _uid: Math.random().toString(36).slice(2),
+        title: item.topic || '',
+        location: item.location || '',
+        link: (item.links && item.links.length) ? item.links[0] : '',
+        description: item.notes || '',
+        start_date: item.startTime ? item.startTime.split(' ')[0] : '',
+        start_time: item.startTime ? item.startTime.split(' ')[1].slice(0,5) : '',
+        end_date: item.endTime ? item.endTime.split(' ')[0] : '',
+        end_time: item.endTime ? item.endTime.split(' ')[1].slice(0,5) : ''
+      }));
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: '生成失败',
+        detail: 'AI未解析到日程，请重试',
+        life: 3000
+      });
     }
-  ];
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: '生成失败',
+      detail: err.response?.data?.message || err.message,
+      life: 4000
+    });
+  }
 }
 
 function removeLLMSchedule(idx) {
   llmResults.value.splice(idx, 1);
 }
 
-function confirmLLMSchedules() {
-  for (const sch of llmResults.value) {
-    if (!sch.title || !sch.start_date || !sch.start_time || !sch.end_date || !sch.end_time) continue;
-    schedules.value.push({
-      id: Date.now() + Math.random(),
+async function confirmLLMSchedules() {
+  // 校验
+  const validSchedules = llmResults.value.filter(
+    sch => sch.title && sch.start_date && sch.start_time && sch.end_date && sch.end_time
+  );
+  if (!validSchedules.length) {
+    toast.add({
+      severity: 'warn',
+      summary: '警告',
+      detail: '没有可用日程',
+      life: 3000
+    });
+    return;
+  }
+
+  const payload = {
+    schedules: validSchedules.map(sch => ({
       title: sch.title,
       start: `${sch.start_date}T${sch.start_time}`,
       end: `${sch.end_date}T${sch.end_time}`,
-      location: sch.location || '',
-      link: sch.link || '',
-      description: sch.description || ''
+      location: sch.location,
+      link: sch.link,
+      description: sch.description
+    }))
+  };
+
+  try {
+    const res = await request.post('/schedule/batch_create', payload);
+    if (res.data.code === 201) {
+      // 直接刷新日程数据
+      showLLMDialog.value = false;
+      await fetchSchedules(dateRange.value[0], dateRange.value[1]);
+      await fetchEvents(selectedDate.value);
+      toast.add({
+        severity: 'success',
+        summary: '成功',
+        detail: '批量创建成功',
+        life: 3000
+      });
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: '错误',
+        detail: res.data.message || '批量创建失败',
+        life: 4000
+      });
+    }
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: '错误',
+      detail: err.response?.data?.message || err.message,
+      life: 4000
     });
   }
-  showLLMDialog.value = false;
 }
 
 </script>
