@@ -1,6 +1,12 @@
 from flask import Blueprint, jsonify, request
 from app.services.genai_service import generate_content
 from app.utils import extract_json_from_string
+from datetime import datetime, timedelta
+from sqlalchemy import and_
+from app import db
+from app.models import Task, Schedule, WeeklyReport
+from app.routes.auth_routes import login_required
+import json
 
 EVENT_PROMPT_TEMPLATE = """
 Now you will serve as a backend. You should reply to me only in JSON format, no extra sentences. I will send you a JSON template to fill in, along with a paragraph, which can contain multiple events, each event can include a topic, date and time range, location, website links. You need to recognize those things in the paraghaph accurately, without any mistake and return them in JSON. JSON fields can be left empty if not recognized, except for startTime and endTime, which should be filled with the recognized date, and you can choose an proper start time. If the event mentioned in text is not a one or multi-day event and also a start time is recognized but no end time is recognized, set end time at one hour later. The language you fill into JSON should be the language you recognized in the text. 
@@ -55,6 +61,25 @@ JSON Schema:
 
 also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the paragraph:
 """
+
+WEEKLY_PROMPT_TEMPLATE = """
+Now you will serve as a backend. You should reply to me only in JSON format, no extra sentences. I will send you a JSON template to fill in, along with json content contains tasks and schedules, which is schedules user engaged and tasks user completed last week. You need to summraize what the user done last week, like what this user have accomplished, what this user have postponed, or anything relavent, then write a weekly report. The report should be write with plain text in multiple paragraph, rather than markdown format. The human language you used to fill into JSON should be the language you recognized in provided json, if multiple language are used in provided json, choose the language that is used most.
+JSON Schema:
+[
+    {
+        "content": str,  # The content of the weekly report
+    }
+]
+also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the json data comtains schedule and task:
+"""
+def get_week_range(date=None):
+    # 返回本周一到本周日日期
+    if not date:
+        date = datetime.now().date()
+    start = date - timedelta(days=date.weekday())
+    end = start + timedelta(days=6)
+    return start, end
+
 # Create a blueprint for the main routes
 bp = Blueprint("llm", __name__, url_prefix="/llm")
 
@@ -103,3 +128,121 @@ def create_task():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@bp.route('/weeklyReportGenerate', methods=['POST'])
+@login_required()
+def generate_weekly_report(current_user):
+    """
+    生成并保存本周周报
+    """
+    # 支持传入week参数，否则为本周
+    week_date = request.json.get("date")
+    if week_date:
+        ref_date = datetime.strptime(week_date, "%Y-%m-%d").date()
+    else:
+        ref_date = datetime.now().date()
+
+    week_start, week_end = get_week_range(ref_date)
+    week_str = f"{week_start.year}年第{week_start.isocalendar()[1]}周"
+    print(f"本周开始时间: {week_start}, 结束时间: {week_end}")
+    # 查询事项（以plan_date为准，已完成和未完成都要）
+    tasks = Task.query.filter(
+        Task.user_id == current_user.id,
+        Task.plan_date >= week_start,
+        Task.plan_date <= week_end
+    ).all()
+
+    # 查询日程（以end_time为准）
+    schedules = Schedule.query.filter(
+        Schedule.user_id == current_user.id,
+        Schedule.end_time >= datetime.combine(week_start, datetime.min.time()),
+        Schedule.end_time <= datetime.combine(week_end, datetime.max.time())
+    ).all()
+
+    # 组装json内容
+    tasks_json = [
+        {
+            "id": t.id,
+            "title": t.title,
+            "planDate": t.plan_date.strftime("%Y-%m-%d"),
+            "dueDate": t.due_date.strftime("%Y-%m-%d"),
+            "priority": t.priority,
+            "notes": t.notes,
+            "status": t.status,
+            "progress": t.progress,
+            "tags": t.tag.split(",") if t.tag else [],
+        }
+        for t in tasks
+    ]
+    schedules_json = [
+        {
+            "id": s.id,
+            "title": s.title,
+            "description": s.description,
+            "startTime": s.start_time.strftime("%Y-%m-%d %H:%M"),
+            "endTime": s.end_time.strftime("%Y-%m-%d %H:%M"),
+            "location": s.location,
+            "link": s.link,
+        }
+        for s in schedules
+    ]
+    input_json = {
+        "tasks": tasks_json,
+        "schedules": schedules_json,
+    }
+
+    # 调用大模型生成
+    input_json_str = json.dumps(input_json, ensure_ascii=False, indent=2)
+    prompt = WEEKLY_PROMPT_TEMPLATE + input_json_str
+
+    llm_response = generate_content(prompt, "")
+
+    # 提取内容
+    try:
+        report_objs = extract_json_from_string(llm_response)
+        content = ""
+        if isinstance(report_objs, list) and report_objs:
+            content = report_objs[0].get("content", "")
+        elif isinstance(report_objs, dict):
+            content = report_objs.get("content", "")
+        else:
+            content = llm_response  # fallback
+    except Exception:
+        content = llm_response
+
+    # 保存到数据库
+    report = WeeklyReport(
+        user_id=current_user.id,
+        week=week_str,
+        content=content
+    )
+    db.session.add(report)
+    db.session.commit()
+
+    return jsonify({
+        "code": 200,
+        "message": "周报生成成功",
+        "data": {
+            "week": week_str,
+            "content": content,
+            "id": report.id
+        }
+    })
+
+@bp.route('/weeklyReportHistory', methods=['GET'])
+@login_required()
+def get_weekly_history(current_user):
+    # 查询所有历史周报，按时间降序
+    reports = WeeklyReport.query.filter_by(user_id=current_user.id).order_by(WeeklyReport.created_at.desc()).all()
+    return jsonify({
+        "code": 200,
+        "data": [
+            {
+                "id": r.id,
+                "week": r.week,
+                "content": r.content
+            }
+            for r in reports
+        ]
+    })
