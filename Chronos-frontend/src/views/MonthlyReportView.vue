@@ -74,37 +74,40 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import { useStore } from 'vuex'
+const store = useStore()
 
-const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH
 
 const step = ref('init') // 'init' | 'loading' | 'done'
 const reportText = ref('')
 
-function generateReport() {
+const historyReports = ref([])
+const showHistoryDialog = ref(false)
+const selectedHistory = ref(null)
+
+async function generateReport() {
   step.value = 'loading'
-  // 模拟异步生成
-  setTimeout(() => {
-    // 你可以把这里替换成真实后端接口请求
-    reportText.value =
-      `【本月工作总结】
-- 完成A项目的核心开发与测试工作，按期上线并获好评。
-- 推进B系统需求调研，输出需求文档并组织评审。
-- 优化了团队周报自动化流程，提升效率20%。
-- 参与技术分享2场，推动团队知识交流。
+  try {
+    const res = await axios.post(`${BACKEND_PATH}/llm/generateMonthlyReport`, {}, {
+      headers: { Authorization: `Bearer ${store.state.token}` }
+    })
 
-【下月工作计划】
-- 启动C平台数据库迁移方案设计与实施。
-- 跟进D项目需求变更，确保按时交付。
-- 继续参与团队协作与技术提升。
+    const data = res.data
+    console.log("res.data:", data)
 
-【问题与建议】
-- 希望加强跨部门沟通，提前介入项目需求讨论。`
+    const content = data?.content || '月报生成失败'
+    reportText.value = content
     step.value = 'done'
-    saveCurrentToHistory()
-  }, 1800)
-  
+    await loadHistoryReports()
+  } catch (err) {
+    step.value = 'init'
+    reportText.value = '月报生成失败，请稍后重试'
+  }
 }
 
 function reset() {
@@ -112,56 +115,23 @@ function reset() {
   reportText.value = ''
 }
 
-import Dialog from 'primevue/dialog'
-
-const historyReports = ref([
-  {
-    id: 1,
-    month: '2024-04',
-    content: `【本月工作总结】
-- 参与X项目，与团队协作完成阶段目标。
-- 学习新技术栈，输出内部分享文档。
-
-【下月工作计划】
-- 深入推进Y业务线开发。
-- 组织团队技术交流。
-
-【问题与建议】
-- 资源协调有待优化。`
-  },
-  {
-    id: 2,
-    month: '2024-03',
-    content: `【本月工作总结】
-- 完成产品迭代发布。
-- 优化线上流程，提升用户满意度。
-
-【下月工作计划】
-- 启动新项目需求讨论。
-- 加强同其他部门沟通。`
-  }
-])
-
-const showHistoryDialog = ref(false)
-const selectedHistory = ref(null)
-
 function openHistoryDialog() {
   showHistoryDialog.value = true
   selectedHistory.value = historyReports.value[0] || null
 }
 
-// 可选：生成后自动保存到历史
-function saveCurrentToHistory() {
-  const now = new Date()
-  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  historyReports.value.unshift({
-    id: Date.now(),
-    month: monthStr,
-    content: reportText.value
-  })
+async function loadHistoryReports() {
+  try {
+    const res = await axios.get(`${BACKEND_PATH}/llm/monthly/history`, {
+      headers: { Authorization: `Bearer ${store.state.token}` }
+    })
+    historyReports.value = res.data
+  } catch (err) {
+    historyReports.value = []
+  }
 }
-</script>
 
-<style scoped>
-/* 让pi-spin动起来（PrimeIcons自带动画） */
-</style>
+onMounted(() => {
+  loadHistoryReports()
+})
+</script>

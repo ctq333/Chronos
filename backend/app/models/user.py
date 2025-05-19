@@ -19,4 +19,4 @@ class User(db.Model):
     tasks = db.relationship('Task', backref='user', cascade="all, delete-orphan", lazy=True)
     sent_invitations = db.relationship('ScheduleInvitation', foreign_keys='ScheduleInvitation.sender_id', backref='sender', cascade="all, delete-orphan", lazy=True)
     received_invitations = db.relationship('ScheduleInvitation', foreign_keys='ScheduleInvitation.receiver_id', backref='receiver', cascade="all, delete-orphan", lazy=True)
-    reports = db.relationship('Report', backref='user', cascade="all, delete-orphan", lazy=True)
+    monthly_reports = db.relationship('MonthlyReport', backref='user', cascade="all, delete-orphan", lazy=True)
