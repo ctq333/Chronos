@@ -2,6 +2,32 @@ from flask import Blueprint, jsonify, request
 from app.services.genai_service import generate_content
 from app.utils import extract_json_from_string
 
+EVENT_PROMPT_TEMPLATE = """
+Now you will serve as a backend. You should reply to me only in JSON format, no extra sentences. I will send you a JSON template to fill in, along with a paragraph, which can contain multiple events, each event can include a topic, date and time range, location, website links. You need to recognize those things in the paraghaph accurately, without any mistake and return them in JSON. JSON fields can be left empty if not recognized, except for startTime and endTime, which should be filled with the recognized date, and you can choose an proper start time. If the event mentioned in text is not a one or multi-day event and also a start time is recognized but no end time is recognized, set end time at one hour later. The language you fill into JSON should be the language you recognized in the text. 
+
+JSON Schema:
+[
+    {
+        "topic": str,
+        "startTime": str,    # Use "yyyy-mm-dd hh:mm" format; if no time is recognized, choose a proper start time. If no date is recognized, use today's date.
+        "endTime": str,      # Use "yyyy-mm-dd hh:mm" format; if no end time is found, set it to "23:59" or a more proper one.
+        "location": str,     # Recognized location in the text.
+        "links": list[str],  # List of recognized links in the text.
+        "notes": str         # Key points for one single event summarized as a string.
+    },
+    {
+        "topic": str,
+        "startTime": str,    # Use "yyyy-mm-dd hh:mm" format; if no time is recognized, choose a proper start time. If no date is recognized, use today's date.
+        "endTime": str,      # Use "yyyy-mm-dd hh:mm" format; if no end time is found, set it to "23:59" or a more proper one.
+        "location": str,     # Recognized location in the text.
+        "links": list[str],  # List of recognized links in the text.
+        "notes": str         # Key points one single event summarized as a string,.
+    },
+    ...
+]
+
+also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the paragraph:
+"""
 # Create a blueprint for the main routes
 bp = Blueprint("llm", __name__, url_prefix="/llm")
 
@@ -16,7 +42,7 @@ def process_input():
             return jsonify({"error": "No paragraph provided"}), 400
 
         # Call the GenAI service
-        response_text = generate_content(paragraph)
+        response_text = generate_content(EVENT_PROMPT_TEMPLATE, paragraph)
 
         # Parse and return the JSON response
         parsed_response = extract_json_from_string(response_text)
