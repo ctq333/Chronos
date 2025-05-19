@@ -1,21 +1,29 @@
-from flask import Blueprint, jsonify, request
-from app.models import Schedule
+from flask import Blueprint, jsonify, request, current_app
+from app.models import Schedule, ScheduleInvitation, User
+from datetime import datetime, timedelta
+from app.routes.auth_routes import login_required
 
 bp = Blueprint("schedule", __name__, url_prefix="/schedule")
 
-@bp.route("/list", methods=["GET"])
-def get_schedule_list():
-    """
-    获取指定用户的所有日程（暂不做token校验）
-    需要传入 GET 参数：user_id
-    """
-    user_id = request.args.get("user_id", type=int)
-    token = request.headers.get("Authorization", "")  # 伪token，暂不校验
+@bp.route("/fetch", methods=["GET"])
+@login_required()
+def get_schedule_list(user):
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
 
-    if not user_id:
-        return jsonify({"success": False, "msg": "缺少 user_id"}), 400
+    query = Schedule.query.filter_by(user_id=user.id)
+    if start_date and end_date:
+        try:
+            start_datetime = datetime.fromisoformat(start_date)
+            end_datetime = datetime.fromisoformat(end_date) + timedelta(days=1)
+            query = query.filter(
+                Schedule.start_time >= start_datetime,
+                Schedule.start_time < end_datetime
+            )
+        except ValueError:
+            return jsonify({"success": False, "msg": "日期格式错误"}), 400
+    schedules = query.order_by(Schedule.start_time).all()
 
-    schedules = Schedule.query.filter_by(user_id=user_id).order_by(Schedule.start_time.desc()).all()
     data = []
     for sch in schedules:
         data.append({
@@ -28,3 +36,133 @@ def get_schedule_list():
             "link": sch.link
         })
     return jsonify({"success": True, "data": data})
+
+
+@bp.route("/create", methods=["POST"])
+@login_required()
+def create_schedule(user):
+    db = current_app.extensions["sqlalchemy"]
+    data = request.get_json()
+    try:
+        start_time = datetime.fromisoformat(data['start'])
+        end_time = datetime.fromisoformat(data['end'])
+    except ValueError:
+        return jsonify({"success": False, "msg": "日期格式错误"}), 400
+ 
+    schedule = Schedule(
+        user_id=user.id,
+        title=data['title'],
+        start_time=start_time,
+        end_time=end_time,
+        location=data.get('location'),
+        link=data.get('link'),
+        description=data.get('description'),
+    )
+ 
+    try:
+        db.session.add(schedule)
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "data": {
+                "id": schedule.id,
+                "title": schedule.title,
+                "description": schedule.description,
+                "start": schedule.start_time.isoformat()[:16],
+                "end": schedule.end_time.isoformat()[:16],
+                "location": schedule.location,
+                "link": schedule.link
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "msg": "创建日程失败"}), 500
+ 
+@bp.route("/update/<int:schedule_id>", methods=["POST"])
+@login_required()
+def update_schedule(user, schedule_id):  
+    db = current_app.extensions["sqlalchemy"]
+    data = request.get_json()
+    try:
+        start_time = datetime.fromisoformat(data['start'])
+        end_time = datetime.fromisoformat(data['end'])
+    except ValueError:
+        return jsonify({"success": False, "msg": "日期格式错误"}), 400
+ 
+    schedule = Schedule.query.filter_by(id=schedule_id, user_id=user.id).first()
+    if not schedule:
+        return jsonify({"success": False, "msg": "未找到该日程"}), 404
+ 
+    schedule.title = data['title']
+    schedule.description = data.get('description')
+    schedule.start_time = start_time
+    schedule.end_time = end_time
+    schedule.location = data.get('location')
+    schedule.link = data.get('link')
+ 
+    try:
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "data": {
+                "id": schedule.id,
+                "title": schedule.title,
+                "description": schedule.description,
+                "start": schedule.start_time.isoformat()[:16],
+                "end": schedule.end_time.isoformat()[:16],
+                "location": schedule.location,
+                "link": schedule.link
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "msg": "更新日程失败"}), 500
+    
+
+@bp.route("/delete/<int:schedule_id>", methods=["DELETE"])
+@login_required()
+def delete_schedule(user, schedule_id):
+    db = current_app.extensions["sqlalchemy"]
+    schedule = Schedule.query.get_or_404(schedule_id)
+
+    try:
+        db.session.delete(schedule)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"code":409,"message": "日程删除失败"})
+
+    return jsonify({"code":200,"message": "日程删除成功"})
+
+
+@bp.route("/invite", methods=["POST"])
+@login_required()
+def invite(user):
+    db = current_app.extensions["sqlalchemy"]
+    data = request.get_json()
+    schedule_id = data['scheduleId']
+    receiver_name = data['receiver']
+
+    receiver = db.session.query(User).filter_by(username=receiver_name).first()
+    if not receiver:
+        return jsonify({"code": 409, "message": "未找到该用户"}), 400
+
+    invitation = ScheduleInvitation(
+        schedule_id = schedule_id,
+        sender_id = user.id,
+        receiver_id = receiver.id,
+        created_at = datetime.utcnow(),
+        status = 0
+    )
+ 
+    try:
+        db.session.add(invitation)
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "data": {
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "msg": "邀请发送失败"}), 500

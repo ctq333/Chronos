@@ -1,93 +1,149 @@
 <template>
-    <div class="min-h-screen bg-gradient-to-br from-white via-gray-100 to-gray-200 p-6 flex flex-col items-center">
-        <div class="max-w-5xl w-full px-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">日程邀请</h2>
-        </div>
-        <div class="max-w-5xl w-full bg-white shadow-lg rounded-xl overflow-hidden pt-4" >
-        <DataTable
-            :value="schedules"
-            dataKey="id"
-            :paginator="true"
-            :rows="10"
-            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            currentPageReportTemplate="显示 {first} 到 {last} 共 {totalRecords} 条日程"
-        >
-            <!-- 多选框列 -->
-            <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
-    
-            <!-- 日程名称 -->
-            <Column field="name" header="日程名称" sortable></Column>
-    
-            <!-- 时间范围 -->
-            <Column field="timeRange" header="时间范围" sortable>
-            <template #body="{ data }">
-                {{ formatTimeRange(data.startTime, data.endTime) }}
+<Toast position="top-center" />
+<div class="min-h-screen bg-gradient-to-br from-white via-gray-100 to-gray-200 p-6 flex flex-col items-center">
+  <div class="max-w-5xl w-full px-6">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">日程邀请</h2>
+  </div>
+    <div class="max-w-5xl w-full bg-white shadow-lg rounded-xl overflow-hidden pt-4" >
+      <DataTable
+        :value="invitations"
+        dataKey="id"
+        :paginator="true"
+        :rows="10"
+        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+        currentPageReportTemplate="显示 {first} 到 {last} 共 {totalRecords} 条日程"
+      >
+        <Column field="name" header="日程名称"></Column>
+        <Column field="timeRange" header="时间范围" sortable>
+          <template #body="{ data }">
+            {{ formatTimeRange(data.startTime, data.endTime) }}
+          </template>
+        </Column>
+        <Column field="location" header="地点"></Column>
+        <Column field="sender" header="邀请人"></Column>
+        <Column header="操作">
+          <template #body="{ data }">
+            <Button 
+              icon="pi pi-check" 
+              class="p-button-primary p-button-sm mr-2" 
+              :disabled="loading_id"
+              :loading="data.id === loading_id && loading_mode === 'accept'"
+              @click="acceptSchedule(data.id)"
+              label="接收"
+            />
+            <Button 
+              icon="pi pi-times" 
+              class="p-button-secondary p-button-sm" 
+              :disabled="loading_id"
+              :loading="data.id === loading_id && loading_mode === 'reject'"
+              @click="rejectSchedule(data.id)"
+              label="拒绝"
+            />
+          </template>
+        </Column>
+        <!-- 加载或无数据 -->
+        <template #empty>
+          <div class="text-center py-8">
+            <template v-if="loading">
+              <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
+              <p class="mt-2 text-gray-500">加载中...</p>
             </template>
-            </Column>
-    
-            <!-- 地点 -->
-            <Column field="location" header="地点" sortable></Column>
-    
-            <!-- 操作栏（接收/拒绝按钮） -->
-            <Column header="操作">
-            <template #body="{ data }">
-                <Button 
-                icon="pi pi-check" 
-                class="p-button-primary p-button-sm mr-2" 
-                @click="acceptSchedule(data.id)"
-                label="接收"
-                />
-                <Button 
-                icon="pi pi-times" 
-                class="p-button-secondary p-button-sm" 
-                @click="rejectSchedule(data.id)"
-                label="拒绝"
-                />
+            <template v-else>
+              <p class="text-gray-500">暂无日程邀请</p>
             </template>
-            </Column>
-        </DataTable>
-        </div>
+          </div>
+        </template>
+      </DataTable>
     </div>
-  </template>
-  
-  <script setup>
-  import { ref } from 'vue';
-  import DataTable from 'primevue/datatable';
-  import Column from 'primevue/column';
-  import Button from 'primevue/button';
-  
-  const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
-  
-  // 模拟数据
-  const schedules = ref([
-    { id: 1, name: '团队周会', startTime: '2023-10-01T09:00:00', endTime: '2023-10-01T10:00:00', location: '会议室A' },
-    { id: 2, name: '客户演示', startTime: '2023-10-02T14:00:00', endTime: '2023-10-02T15:30:00', location: '线上会议' },
-    { id: 3, name: '项目评审', startTime: '2023-10-03T10:00:00', endTime: '2023-10-03T12:00:00', location: '会议室B' },
-  ]);
-  
-  const selectedSchedules = ref([]); // 多选存储
-  
-  // 格式化时间范围
-  const formatTimeRange = (start, end) => {
-    return `${new Date(start).toLocaleString()} - ${new Date(end).toLocaleTimeString()}`;
-  };
-  
-  // 接收日程
-  const acceptSchedule = (id) => {
-    alert(`已接收日程 ID: ${id}`);
-    // 实际调用 API 更新状态
-  };
-  
-  // 拒绝日程
-  const rejectSchedule = (id) => {
-    alert(`已拒绝日程 ID: ${id}`);
-    // 实际调用 API 更新状态
-  };
-  </script>
-  
-  <style scoped>
-  /* 按钮间距调整 */
-  .mr-2 {
-    margin-right: 0.5rem;
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Button from 'primevue/button';
+import Toast from 'primevue/toast';
+import { useToast } from 'primevue/usetoast';
+import request from '@/utils/request';
+
+const loading = ref(false);
+const toast = useToast();
+const invitations = ref([]);
+const loading_id = ref();
+const loading_mode = ref();
+
+// 获取邀请数据
+async function fetchInvitations() {
+  loading.value = true;
+  try {
+    const res = await request.get('/invitation/fetch', null)
+    invitations.value = res.data.data
+  } catch (err) {
+    console.error('获取邀请失败:', err)
+    // 实际项目中这里应该添加用户提示
+  } finally {
+    loading.value = false; 
   }
-  </style>
+}
+
+// 初始化
+onMounted(() => {
+  fetchInvitations();
+})
+
+
+// 格式化时间范围
+const formatTimeRange = (start, end) => {
+  return `${new Date(start).toLocaleString()} - ${new Date(end).toLocaleTimeString()}`;
+};
+
+// 接收日程
+async function acceptSchedule(id) {
+  loading_id.value = id;
+  loading_mode.value = "accept";
+  try {
+    const res = await request.post('/invitation/accept', { id: id });
+    if (res.data.code === 200) {
+      toast.add({ severity: 'success', summary: '成功', detail: '已接受日程邀请', life: 3000 });
+      await fetchInvitations();
+    } else {
+      toast.add({ severity: 'error', summary: '错误', detail: res.data.message, life: 3000 });
+    }
+  } catch (err) {
+    console.error('接受邀请失败:', err);
+    toast.add({ severity: 'error', summary: '错误', detail: '操作失败，请稍后重试', life: 3000 });
+  } finally {
+    loading_id.value = null;
+    loading_mode.value = null;
+  }
+};
+
+// 拒绝日程
+async function rejectSchedule(id) {
+  loading_id.value = id;
+  loading_mode.value = "reject";
+  try {
+    const res = await request.post('/invitation/reject', { id: id });
+    if (res.data.code === 200) {
+      toast.add({ severity: 'success', summary: '成功', detail: '已拒绝日程邀请', life: 3000 });
+      await fetchInvitations();
+    } else {
+      toast.add({ severity: 'error', summary: '错误', detail: res.data.message, life: 3000 });
+    }
+  } catch (err) {
+    console.error('接受邀请失败:', err);
+    toast.add({ severity: 'error', summary: '错误', detail: '操作失败，请稍后重试', life: 3000 });
+  } finally {
+    loading_id.value = null;
+    loading_mode.value = null;
+  }
+};
+</script>
+
+<style scoped>
+/* 按钮间距调整 */
+.mr-2 {
+  margin-right: 0.5rem;
+}
+</style>

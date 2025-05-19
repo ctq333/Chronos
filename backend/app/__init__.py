@@ -22,12 +22,13 @@ def create_app():
     from app.models import User, Schedule, Task, ScheduleInvitation, SubTask, Report
 
     # Register blueprints (导入蓝图对象并注册)
-    from app.routes import llm_routes, admin_routes, auth_routes, task_routes, schedule_routes
+    from app.routes import llm_routes, admin_routes, auth_routes, task_routes, schedule_routes, invitation_routes
     app.register_blueprint(llm_routes)
     app.register_blueprint(admin_routes)
     app.register_blueprint(auth_routes)
     app.register_blueprint(task_routes)
     app.register_blueprint(schedule_routes)
+    app.register_blueprint(invitation_routes)
 
     # CORS configuration
     allowed_origins = os.getenv("ALLOWED_CORS_ORIGINS", "*").split(",")
