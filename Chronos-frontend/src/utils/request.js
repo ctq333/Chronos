@@ -1,8 +1,6 @@
 import axios from 'axios'
 import store from '@/store'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
+import router from '@/router'
 
 // create an axios instance
 const http = axios.create({

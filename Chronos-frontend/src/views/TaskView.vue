@@ -695,17 +695,33 @@ function openPostponeDialog(task) {
 	postponeDate.value = new Date(task.planDate);
 	showPostponeDialog.value = true;
 }
-function onPostponeSubmit() {
-	if (!postponeDate.value) return;
-	const idx = tasks.value.findIndex(t => t.id === currentPostponeTaskId.value);
-	if (idx !== -1) {
-		const dateStr = formatDateObjToStr(postponeDate.value);
-		tasks.value[idx].planDate = dateStr;
-		tasks.value[idx].postponeCount = (tasks.value[idx].postponeCount || 0) + 1;
-	}
-	showPostponeDialog.value = false;
-}
+async function onPostponeSubmit() {
+  if (!postponeDate.value) return;
 
+  const idx = tasks.value.findIndex(t => t.id === currentPostponeTaskId.value);
+  if (idx === -1) return;
+
+  const dateStr = formatDateObjToStr(postponeDate.value);
+
+  try {
+    const res = await axios.post(
+      `/api/task/${currentPostponeTaskId.value}/postpone`,
+      { newPlanDate: dateStr },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+
+    if (res.data.code === 200) {
+      // 后端成功，更新前端任务数据
+      tasks.value[idx].planDate = dateStr;
+      tasks.value[idx].postponeCount = (tasks.value[idx].postponeCount || 0) + 1;
+      showPostponeDialog.value = false;
+    } else {
+      alert(res.data.message || '推迟失败');
+    }
+  } catch (error) {
+    alert('推迟请求失败: ' + (error.response?.data?.message || error.message));
+  }
+}
 const showAddSubTaskDialog = ref(false);
 const currentSubTaskParentId = ref(null);
 const subTaskTitle = ref('');
