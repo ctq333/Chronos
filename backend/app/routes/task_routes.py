@@ -433,3 +433,31 @@ def batch_create(current_user):
         created_ids.append(task.id)
     db.session.commit()
     return jsonify({"code": 201, "message": "批量创建成功", "data": {"created": created_ids}})
+
+@bp.route("/<int:task_id>/add_subtasks", methods=["POST"])
+@login_required()
+def add_subtasks(current_user, task_id):
+    """
+    批量添加子任务
+    入参: { "subtasks": [ {"title": ...}, ... ] }
+    """
+    data = request.json
+    subtask_list = data.get("subtasks", [])
+    if not subtask_list or not isinstance(subtask_list, list):
+        return jsonify({"code":400, "message": "No subtasks provided"})
+    from app.models.task import Task
+    from app.models.subtask import SubTask
+    task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return jsonify({"code":404, "message": "Task not found"})
+    created = []
+    for sub in subtask_list:
+        title = sub.get("title", "").strip()
+        if not title:
+            continue
+        st = SubTask(parent_task_id=task.id, title=title, completed=0)
+        db.session.add(st)
+        db.session.flush()  # 获取id
+        created.append({"id": st.id, "title": st.title, "completed": False})
+    db.session.commit()
+    return jsonify({"code": 201, "data": created})

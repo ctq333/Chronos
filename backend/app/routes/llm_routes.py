@@ -72,6 +72,22 @@ JSON Schema:
 ]
 also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the json data comtains schedule and task:
 """
+
+SUBTASK_PROMPT_TEMPLATE = """
+Now you will serve as a backend. You should reply to me only in JSON format, no extra sentences. I will send you a JSON template to fill in, along with json content contains one task user needs to complete. Your task is that plan one or more subtasks based on what user provided in json. The human language you used to fill into JSON should be the language you recognized in provided json.
+JSON Schema:
+[
+    {
+        "title": str,  # The heading of the subtask
+    },
+    {
+        "title": str,  # The heading of the subtask
+    },
+]
+also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the json data comtains one task:
+"""
+
+
 def get_week_range(date=None):
     # 返回本周一到本周日日期
     if not date:
@@ -246,3 +262,29 @@ def get_weekly_history(current_user):
             for r in reports
         ]
     })
+
+@bp.route("/generateSubTasks", methods=["POST"])
+def generate_subtasks():
+    """
+    智能生成子任务（LLM）
+    入参：{ "task": { ... } }
+    出参：[{"title": ...}, ...]
+    """
+    try:
+        task_json = request.json.get("task")
+        if not task_json or not isinstance(task_json, dict):
+            return jsonify({"error": "No valid task provided"}), 400
+
+        # 用SUBTASK_PROMPT_TEMPLATE
+        import json as _json
+        prompt = SUBTASK_PROMPT_TEMPLATE + _json.dumps(task_json, ensure_ascii=False, indent=2)
+        response_text = generate_content(prompt, "")
+        subtasks = extract_json_from_string(response_text)
+        # 确保是列表且格式正确
+        if isinstance(subtasks, list) and all("title" in sub for sub in subtasks):
+            return jsonify({"code": 200, "data": subtasks})
+        else:
+            return jsonify({"error": "Invalid LLM JSON", "llm": response_text}), 500
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
