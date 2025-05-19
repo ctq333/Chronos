@@ -16,8 +16,9 @@ def extract_json_from_string(input_text):
         return json.loads(input_text)
     except json.JSONDecodeError:
         # If parsing fails, try to extract valid JSON blocks
-        json_start = input_text.find("{")  # Find the first JSON object start
-        json_end = input_text.rfind("}")  # Find the last JSON object end
+        print(input_text)
+        json_start = input_text.find("[")  # Find the first JSON object start
+        json_end = input_text.rfind("]")  # Find the last JSON object end
 
         if json_start != -1 and json_end != -1:
             # Extract the potential JSON substring
