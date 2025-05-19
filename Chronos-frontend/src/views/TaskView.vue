@@ -809,53 +809,84 @@ function openLLMDialog() {
 	llmResults.value = [];
 }
 
-function handleLLMCreate() {
-	llmResults.value = [
-		{
-			_uid: Math.random().toString(36).slice(2),
-			title: '写周报',
-			plan_date: '2025-04-22',
-			due_date: '2025-04-25',
-			priority: 2,
-			tagsInput: '文档,总结',
-			notes: '需包括本周工作重点'
-		},
-		{
-			_uid: Math.random().toString(36).slice(2),
-			title: '提交发票',
-			plan_date: '2025-04-27',
-			due_date: '2025-04-30',
-			priority: 1,
-			tagsInput: '财务',
-			notes: ''
-		}
-	];
+async function handleLLMCreate() {
+  if (!llmInput.value.trim()) {
+    alert('请输入自然语言描述');
+    return;
+  }
+  try {
+    llmResults.value = [];
+    // loading 状态可选
+    const res = await axios.post(
+      '/api/llm/createTask',
+      { paragraph: llmInput.value },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+    if (Array.isArray(res.data)) {
+      // 转换后端AI字段名映射到前端结构
+      llmResults.value = res.data.map(item => ({
+        _uid: Math.random().toString(36).slice(2),
+        title: item.heading || '',
+        plan_date: item.planDate || '',
+        due_date: item.dueDate || '',
+        priority: item.priority !== undefined ? Number(item.priority) : 1,
+        tagsInput: item.tags || '',
+        notes: item.notes || ''
+      }));
+    } else {
+      alert('AI未能解析出事项，请尝试简化输入。');
+    }
+  } catch (err) {
+    alert('智能生成失败: ' + (err.response?.data?.message || err.message));
+  }
 }
+
 function removeLLMSchedule(idx) {
 	llmResults.value.splice(idx, 1);
 }
-function confirmLLMSchedules() {
-	for (const task of llmResults.value) {
-		if (!task.title || !task.plan_date || !task.due_date) continue;
-		const tags = task.tagsInput
-			? task.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
-			: [];
-		tasks.value.push({
-			id: Date.now() + Math.random(),
-			title: task.title,
-			planDate: task.plan_date,
-			dueDate: task.due_date,
-			priority: task.priority,
-			tags,
-			postponeCount: 0,
-			notes: task.notes,
-			subtasks: [],
-			progress: 0,
-			status: 'not-started'
-		});
-	}
-	showLLMDialog.value = false;
+async function confirmLLMSchedules() {
+  // 过滤有效任务
+  const validTasks = llmResults.value.filter(
+    t => t.title && t.plan_date && t.due_date
+  );
+  if (!validTasks.length) {
+    alert('没有可用事项');
+    return;
+  }
+
+  // 构造后端需要的批量数据格式
+  const payload = validTasks.map(task => ({
+    title: task.title,
+    planDate: task.plan_date,
+    dueDate: task.due_date,
+    priority: task.priority !== undefined ? Number(task.priority) : 1,
+    tags: task.tagsInput
+      ? task.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+      : [],
+    notes: task.notes,
+    subtasks: []  // 智能创建暂不含子任务
+  }));
+
+  try {
+    const res = await axios.post(
+      '/api/task/batch_create',
+      { tasks: payload },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+    if (res.data.code === 201 && Array.isArray(res.data.data.created)) {
+      // 可选：直接插入，推荐刷新列表
+      await fetchTasks();
+      showLLMDialog.value = false;
+      llmResults.value = [];
+      llmInput.value = '';
+    } else {
+      alert(res.data.message || '批量创建失败');
+    }
+  } catch (err) {
+    alert('批量创建失败: ' + (err.response?.data?.message || err.message));
+  }
 }
+
 async function confirmDelete(row) {
   if (!confirm(`确定要删除"${row.title}"?`)) return;
   try {
