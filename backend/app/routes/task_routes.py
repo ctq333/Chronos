@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Task, SubTask
-from datetime import datetime
+from datetime import datetime, date
 from app.routes.auth_routes import login_required  # 假设你的登录验证装饰器在这里
 
 bp = Blueprint("task", __name__, url_prefix="/task")
@@ -85,6 +85,54 @@ def get_task_list(current_user):
     tasks = (
         Task.query
         .filter_by(user_id=current_user.id)
+        .order_by(Task.status.asc(), Task.due_date.asc(), Task.plan_date.asc())
+        .all()
+    )
+
+    def serialize_task(task):
+        return {
+            "id": task.id,
+            "title": task.title,
+            "planDate": task.plan_date.strftime("%Y-%m-%d") if task.plan_date else "",
+            "dueDate": task.due_date.strftime("%Y-%m-%d") if task.due_date else "",
+            "priority": task.priority,
+            "tags": task.tag.split(",") if task.tag else [],
+            "postponeCount": task.postpone_count,
+            "notes": task.notes,
+            "subtasks": [
+                {
+                    "id": sub.id,
+                    "title": sub.title,
+                    "completed": bool(sub.completed)
+                } for sub in task.subtasks
+            ],
+            "progress": task.progress,
+            "status": (
+                "completed" if task.status == 2
+                else "in-progress" if task.status == 1
+                else "not-started"
+            )
+        }
+
+    return jsonify({
+        "code": 200,
+        "data": {
+            "tasks": [serialize_task(task) for task in tasks]
+        }
+    })
+
+
+@bp.route('/home', methods=['GET'])
+@login_required()
+def get_task_home(current_user):
+    """
+    获取当前登录用户当日的未完成事项
+    """
+    tasks = (
+        Task.query
+        .filter_by(user_id=current_user.id)
+        .filter(Task.plan_date<=date.today(), Task.due_date>=date.today())
+        .filter(Task.progress!=100)
         .order_by(Task.status.asc(), Task.due_date.asc(), Task.plan_date.asc())
         .all()
     )
