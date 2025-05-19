@@ -390,3 +390,46 @@ def add_subtask(current_user, task_id):
             'completed': subtask.completed
         }
     }), 201
+
+@bp.route('/batch_create', methods=['POST'])
+@login_required()
+def batch_create(current_user):
+    data = request.get_json()
+    tasks = data.get("tasks", [])
+    created_ids = []
+    for t in tasks:
+        title = t.get("title", "").strip()
+        plan_date = t.get("planDate")
+        due_date = t.get("dueDate")
+        priority = t.get("priority", 2)
+        notes = t.get("notes", "")
+        tags = t.get("tags", [])
+        subtasks = t.get("subtasks", [])
+        if not title or not plan_date or not due_date:
+            continue
+        task = Task(
+            user_id=current_user.id,
+            title=title,
+            plan_date=datetime.strptime(plan_date, "%Y-%m-%d").date(),
+            due_date=datetime.strptime(due_date, "%Y-%m-%d").date(),
+            priority=priority,
+            notes=notes,
+            status=0,
+            tag=",".join(tags) if tags else None,
+            postpone_count=0,
+            progress=0,
+        )
+        for sub in subtasks:
+            sub_title = sub.get("title", "").strip()
+            if not sub_title:
+                continue
+            subtask = SubTask(
+                title=sub_title,
+                completed=sub.get("completed", False)
+            )
+            task.subtasks.append(subtask)
+        db.session.add(task)
+        db.session.flush()  # 获取id
+        created_ids.append(task.id)
+    db.session.commit()
+    return jsonify({"code": 201, "message": "批量创建成功", "data": {"created": created_ids}})
