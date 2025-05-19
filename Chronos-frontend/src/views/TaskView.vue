@@ -46,10 +46,14 @@
 				</div>
 			</div>
 		</div>
-
+		
 		<!-- List View -->
 		<div>
-			<div v-if="filteredTasks.length === 0" class="text-gray-500 text-center mt-8">
+			<div v-if="loading" class="text-center py-8">
+				<i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
+				<p class="mt-2 text-gray-500">加载中...</p>
+			</div>
+			<div v-if="filteredTasks.length === 0 && loading!=true" class="text-gray-500 text-center mt-8">
 				暂无事项
 			</div>
 			<div class="grid gap-4">
@@ -139,7 +143,7 @@
                             </div>
                             <div class="flex items-center gap-1">
                                 <Button icon="pi pi-pencil" rounded text class="p-button-sm" @click="openEditDialog(event)" />
-                                <Button icon="pi pi-trash" rounded text severity="danger" class="p-button-sm" @click="confirmDelete(event)" />
+                                <Button icon="pi pi-trash" rounded text severity="danger" class="p-button-sm" :loading="submitLoading" @click="confirmDelete(event)" />
                                 <!-- 状态切换按钮 -->
                                 <Button
                                     :icon="event.status === 'completed' ? 'pi pi-undo' : 'pi pi-check'"
@@ -206,75 +210,81 @@
 				</div>
 				<div class="flex justify-end gap-2">
 					<Button label="取消" icon="pi pi-times" severity="secondary" @click="showDialog=false" type="button" />
-					<Button :label="dialogMode==='create'?'创建':'保存修改'" icon="pi pi-check" type="submit" />
+					<Button :label="dialogMode==='create'?'创建':'保存修改'" icon="pi pi-check" :loading="submitLoading" type="submit" />
 				</div>
 			</form>
 		</Dialog>
 
 		<!-- 智能事项批量创建对话框 -->
 		<Dialog v-model:visible="showLLMDialog" header="LLM智能创建事项" modal style="width: 700px">
-			<div>
-				<Textarea
-					v-model="llmInput"
-					:autoResize="false"
-					rows="5"
-					style="max-height:120px;overflow-y:auto"
-					placeholder="请输入自然语言描述，例如：5月10日处理发票，下周三前提交设计文档"
-					class="w-full"
-				/>
-				<Button label="生成事项" class="mt-2" icon="pi pi-send" @click="handleLLMCreate" />
+			<div v-if="llmLoading" class="py-8 flex flex-col items-center">
+				<i class="pi pi-spin pi-spinner text-2xl text-blue-500 mb-3"></i>
+				<div class="text-gray-600">正在生成，请稍候...</div>
 			</div>
-			<div v-if="llmResults.length" class="mt-4 space-y-4">
-				<div
-					v-for="(task, idx) in llmResults"
-					:key="task._uid"
-					class="p-2 bg-gray-100 rounded relative"
-				>
-					<div class="flex justify-between">
-						<b>事项{{ idx + 1 }}</b>
-						<Button
-							icon="pi pi-trash"
-							class="p-button-sm absolute top-2 right-2"
-							severity="danger"
-							text
-							@click="removeLLMSchedule(idx)"
-							title="删除该事项"
-						/>
-					</div>
-					<div class="grid grid-cols-2 gap-2 mt-2">
-						<div>
-							<label class="block text-xs text-gray-500 mb-1">标题</label>
-							<InputText v-model="task.title" class="w-full" />
-						</div>
-						<div>
-							<label class="block text-xs text-gray-500 mb-1">计划处理日期</label>
-							<InputText v-model="task.plan_date" class="w-full" />
-						</div>
-						<div>
-							<label class="block text-xs text-gray-500 mb-1">截止日期</label>
-							<InputText v-model="task.due_date" class="w-full" />
-						</div>
-						<div>
-							<label class="block text-xs text-gray-500 mb-1">优先级</label>
-							<SelectButton 
-								v-model="task.priority"
-								:options="priorityOptions"
-								optionLabel="label"
-								optionValue="value"
-								class="w-full"
+			<div v-else>
+				<div>
+					<Textarea
+						v-model="llmInput"
+						:autoResize="false"
+						rows="5"
+						style="max-height:120px;overflow-y:auto"
+						placeholder="请输入自然语言描述，例如：5月10日处理发票，下周三前提交设计文档"
+						class="w-full"
+					/>
+					<Button label="生成事项" class="mt-2" icon="pi pi-send" @click="handleLLMCreate" />
+				</div>
+				<div v-if="llmResults.length" class="mt-4 space-y-4">
+					<div
+						v-for="(task, idx) in llmResults"
+						:key="task._uid"
+						class="p-2 bg-gray-100 rounded relative"
+					>
+						<div class="flex justify-between">
+							<b>事项{{ idx + 1 }}</b>
+							<Button
+								icon="pi pi-trash"
+								class="p-button-sm absolute top-2 right-2"
+								severity="danger"
+								text
+								@click="removeLLMSchedule(idx)"
+								title="删除该事项"
 							/>
 						</div>
-						<div class="col-span-2">
-							<label class="block text-xs text-gray-500 mb-1">标签（逗号分隔）</label>
-							<InputText v-model="task.tagsInput" class="w-full" />
-						</div>
-						<div class="col-span-2">
-							<label class="block text-xs text-gray-500 mb-1">备注</label>
-							<InputText v-model="task.notes" class="w-full" />
+						<div class="grid grid-cols-2 gap-2 mt-2">
+							<div>
+								<label class="block text-xs text-gray-500 mb-1">标题</label>
+								<InputText v-model="task.title" class="w-full" />
+							</div>
+							<div>
+								<label class="block text-xs text-gray-500 mb-1">计划处理日期</label>
+								<InputText v-model="task.plan_date" class="w-full" />
+							</div>
+							<div>
+								<label class="block text-xs text-gray-500 mb-1">截止日期</label>
+								<InputText v-model="task.due_date" class="w-full" />
+							</div>
+							<div>
+								<label class="block text-xs text-gray-500 mb-1">优先级</label>
+								<SelectButton 
+									v-model="task.priority"
+									:options="priorityOptions"
+									optionLabel="label"
+									optionValue="value"
+									class="w-full"
+								/>
+							</div>
+							<div class="col-span-2">
+								<label class="block text-xs text-gray-500 mb-1">标签（逗号分隔）</label>
+								<InputText v-model="task.tagsInput" class="w-full" />
+							</div>
+							<div class="col-span-2">
+								<label class="block text-xs text-gray-500 mb-1">备注</label>
+								<InputText v-model="task.notes" class="w-full" />
+							</div>
 						</div>
 					</div>
+					<Button label="确认创建全部" icon="pi pi-check" :loading="submitLoading" class="mt-2" @click="confirmLLMSchedules" :disabled="llmResults.length===0" />
 				</div>
-				<Button label="确认创建全部" icon="pi pi-check" class="mt-2" @click="confirmLLMSchedules" :disabled="llmResults.length===0" />
 			</div>
 		</Dialog>
 
@@ -287,7 +297,7 @@
 				</div>
 				<div class="flex justify-end gap-2">
 					<Button label="取消" icon="pi pi-times" severity="secondary" @click="showPostponeDialog=false" type="button" />
-					<Button label="确定" icon="pi pi-check" type="submit" />
+					<Button label="确定" icon="pi pi-check" :loading="submitLoading" type="submit" />
 				</div>
 			</form>
 		</Dialog>
@@ -392,7 +402,8 @@ import { useStore } from 'vuex'
 const store = useStore()
 
 const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
-
+const submitLoading = ref(false)   // 用于“创建/保存/删除”等提交按钮
+const llmLoading = ref(false)      // 用于 LLM 智能生成时的加载状态
 function getPriorityText(priority) {
 	const texts = { 1: '低', 2: '中', 3: '高', 4: '紧急' };
 	return texts[priority] || priority;
@@ -405,8 +416,9 @@ const priorityOptions = [
 ];
 
 const tasks = ref([])
-
+const loading = ref(false);
 async function fetchTasks() {
+  loading.value = true;
   try {
     const res = await axios.get('/api/task/list', {
       headers: {
@@ -420,6 +432,8 @@ async function fetchTasks() {
     }
   } catch (err) {
     alert('获取事项错误: ' + (err.response?.data?.message || err.message))
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -579,7 +593,7 @@ async function onSubmit() {
     alert('请填写所有必填字段');
     return;
   }
-
+  submitLoading.value = true;
   // 1. 组装后端需要的数据
   const planDateStr = formatDateObjToStr(form.value.planDate);
   const dueDateStr = formatDateObjToStr(form.value.dueDate);
@@ -634,6 +648,9 @@ async function onSubmit() {
     }
   } catch (err) {
     alert('网络/服务器错误：' + (err.response?.data?.message || err.message));
+  } finally {
+    submitLoading.value = false; // 结束加载
+    showDialog.value = false;
   }
 }
 async function onEditSubmit() {
@@ -641,7 +658,7 @@ async function onEditSubmit() {
     alert('请填写所有必填字段');
     return;
   }
-
+  submitLoading.value = true;
   const planDateStr = formatDateObjToStr(form.value.planDate);
   const dueDateStr = formatDateObjToStr(form.value.dueDate);
   const tags = form.value.tagsInput
@@ -676,6 +693,9 @@ async function onEditSubmit() {
     }
   } catch (err) {
     alert("网络/服务器错误：" + (err.response?.data?.message || err.message));
+  } finally {
+    submitLoading.value = false;
+    showDialog.value = false;
   }
 }
 // 修复标记完成问题（务必用id查找原tasks对象）
@@ -697,7 +717,7 @@ function openPostponeDialog(task) {
 }
 async function onPostponeSubmit() {
   if (!postponeDate.value) return;
-
+  submitLoading.value = true;
   const idx = tasks.value.findIndex(t => t.id === currentPostponeTaskId.value);
   if (idx === -1) return;
 
@@ -720,6 +740,9 @@ async function onPostponeSubmit() {
     }
   } catch (error) {
     alert('推迟请求失败: ' + (error.response?.data?.message || error.message));
+  } finally {
+    submitLoading.value = false;
+    showPostponeDialog.value = false;
   }
 }
 const showAddSubTaskDialog = ref(false);
@@ -814,6 +837,7 @@ async function handleLLMCreate() {
     alert('请输入自然语言描述');
     return;
   }
+  llmLoading.value = true;
   try {
     llmResults.value = [];
     // loading 状态可选
@@ -838,6 +862,8 @@ async function handleLLMCreate() {
     }
   } catch (err) {
     alert('智能生成失败: ' + (err.response?.data?.message || err.message));
+  } finally {
+    llmLoading.value = false; // 结束转圈
   }
 }
 
@@ -849,6 +875,7 @@ async function confirmLLMSchedules() {
   const validTasks = llmResults.value.filter(
     t => t.title && t.plan_date && t.due_date
   );
+  submitLoading.value = true;
   if (!validTasks.length) {
     alert('没有可用事项');
     return;
@@ -884,11 +911,14 @@ async function confirmLLMSchedules() {
     }
   } catch (err) {
     alert('批量创建失败: ' + (err.response?.data?.message || err.message));
+  } finally {
+    submitLoading.value = false;
   }
 }
 
 async function confirmDelete(row) {
   if (!confirm(`确定要删除"${row.title}"?`)) return;
+  submitLoading.value = true;
   try {
     const res = await axios.delete(`/api/task/${row.id}/delete`, {
       headers: { 'Authorization': 'Bearer ' + store.state.token }
@@ -900,6 +930,8 @@ async function confirmDelete(row) {
     }
   } catch (err) {
     alert('删除失败: ' + (err.response?.data?.message || err.message));
+  } finally {
+    submitLoading.value = false;
   }
 }
 
@@ -942,7 +974,7 @@ function openScheduleDialog(task) {
   }
   showScheduleDialog.value = true;
 }
-function onScheduleSubmit() {
+async function onScheduleSubmit() {
   const f = scheduleForm.value;
   if (!f.title || !f.startDate || !f.startTime || !f.endDate || !f.endTime) {
     alert('请填写所有必填字段');
@@ -950,16 +982,40 @@ function onScheduleSubmit() {
   }
   const startDateStr = formatDateObjToStr(f.startDate);
   const endDateStr = formatDateObjToStr(f.endDate);
-  schedules.value.push({
-    id: Date.now() + Math.random(),
+  const start = `${startDateStr}T${f.startTime}`;
+  const end = `${endDateStr}T${f.endTime}`;
+
+  // 时间校验
+  if (new Date(start) > new Date(end)) {
+    alert('结束时间必须晚于开始时间');
+    return;
+  }
+
+  const payload = {
     title: f.title,
-    start: `${startDateStr}T${f.startTime}`,
-    end: `${endDateStr}T${f.endTime}`,
-    location: f.location,
-    link: f.link,
-    description: f.description
-  });
-  showScheduleDialog.value = false;
+    start,
+    end,
+    location: f.location || '',
+    link: f.link || '',
+    description: f.description || ''
+  };
+
+  try {
+    const res = await axios.post(
+      '/api/schedule/create',
+      payload,
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+    if (res.data.success) {
+      alert('创建日程成功');
+      showScheduleDialog.value = false;
+      // 可选：你可以直接跳转到日程页面，或者刷新本地schedules
+    } else {
+      alert(res.data.msg || '创建失败');
+    }
+  } catch (err) {
+    alert('创建失败: ' + (err.response?.data?.msg || err.message));
+  }
 }
 
 // 用于防抖（可选）
