@@ -71,35 +71,34 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
+import axios from 'axios';
+import store from '@/store'
 
 const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
 
 const step = ref('init') // 'init' | 'loading' | 'done'
 const reportText = ref('')
 
-function generateReport() {
+async function generateReport() {
   step.value = 'loading'
-  // 模拟异步生成
-  setTimeout(() => {
-    // 你可以把这里替换成真实后端接口请求
-    reportText.value =
-      `【本月工作总结】
-- 完成A项目的核心开发与测试工作，按期上线并获好评。
-- 推进B系统需求调研，输出需求文档并组织评审。
-- 优化了团队周报自动化流程，提升效率20%。
-- 参与技术分享2场，推动团队知识交流。
-
-【下月工作计划】
-- 启动C平台数据库迁移方案设计与实施。
-- 跟进D项目需求变更，确保按时交付。
-- 继续参与团队协作与技术提升。
-
-【问题与建议】
-- 希望加强跨部门沟通，提前介入项目需求讨论。`
-    step.value = 'done'
-  }, 1800)
+  try {
+    const res = await axios.post('/api/llm/weeklyReportGenerate', {}, {
+      headers: { Authorization: 'Bearer ' + store.state.token }
+    })
+    if (res.data.code === 200) {
+      reportText.value = res.data.data.content
+      step.value = 'done'
+      await fetchHistoryReports() // 自动刷新历史
+    } else {
+      step.value = 'init'
+      alert(res.data.message || '生成失败')
+    }
+  } catch (err) {
+    step.value = 'init'
+    alert('生成失败: ' + (err.response?.data?.message || err.message))
+  }
 }
 
 function reset() {
@@ -107,31 +106,18 @@ function reset() {
   reportText.value = ''
 }
 
-const historyReports = ref([
-  {
-    id: 1,
-    week: '2024年第15周',
-    content: `【本周工作总结】
-- 完成X功能开发。
-- 修复若干线上bug。
-- 团队技术分享一次。
+const historyReports = ref([])
 
-【下周工作计划】
-- 启动Y模块重构。
-- 参与产品需求讨论。`
-  },
-  {
-    id: 2,
-    week: '2024年第14周',
-    content: `【本周工作总结】
-- 参与需求评审。
-- 完成自动化测试覆盖。
-
-【下周工作计划】
-- 跟进上线回归。
-- 向团队同步最佳实践。`
+async function fetchHistoryReports() {
+  const res = await axios.get('/api/llm/weeklyReportHistory', {
+    headers: { Authorization: 'Bearer ' + store.state.token }
+  })
+  if (res.data.code === 200) {
+    historyReports.value = res.data.data
+    selectedHistory.value = historyReports.value[0] || null
   }
-])
+}
+onMounted(fetchHistoryReports)
 
 const selectedHistory = ref(historyReports.value[0] || null)
 

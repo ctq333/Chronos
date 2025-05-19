@@ -38,11 +38,11 @@
         <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
         <p class="mt-2 text-gray-500">加载中...</p>
       </div>
-      <div v-else-if="filteredSchedules.length === 0" class="text-gray-500 text-center mt-8">
+      <div v-else-if="schedules.length === 0" class="text-gray-500 text-center mt-8">
         暂无日程
       </div>
       <div v-else class="grid gap-4">
-        <Card v-for="event in filteredSchedules" :key="event.id" class="w-full">
+        <Card v-for="event in schedules" :key="event.id" class="w-full">
           <template #title>
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span>{{ event.title }}</span>
@@ -87,10 +87,14 @@
         </div>
         <!-- Timeline 区域 -->
         <div class="flex-1 min-w-0">
-          <div v-if="filteredEvents.length === 0" class="text-gray-500 text-center mt-8">
+          <div v-if="loading" class="text-center py-8">
+            <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
+            <p class="mt-2 text-gray-500">加载中...</p>
+          </div>
+          <div v-else-if="events.length === 0" class="text-gray-500 text-center mt-8">
             当天暂无日程
           </div>
-          <Timeline :value="timelineEvents" align="alternate" v-else>
+          <Timeline :value="events" align="alternate" v-else>
             <template #content="slotProps">
               <Card class="w-full">
                 <template #title>
@@ -317,13 +321,15 @@ const loading = ref(false);
 const submitLoading = ref(false);
 const toast = useToast();
 
-const schedules = ref([]);
-const dateRange = ref([]);     // 修正后的日期范围初始化
 const viewMode = ref('list');
 const viewModes = [
   { label: '列表', value: 'list', icon: 'pi pi-list' },
   { label: '日历', value: 'calendar', icon: 'pi pi-calendar' }
 ];
+const schedules = ref([]);
+const dateRange = ref([]);
+const events = ref([]);
+const selectedDate = ref(new Date());
 
 const showDialog = ref(false);     // 开启创建/编辑框
 const dialogMode = ref('create');
@@ -360,7 +366,7 @@ function getDefaultDateRange() {
   ];
 }
 
-// 获取日程数据
+// 获取列表页日程数据
 async function fetchSchedules(start, end) {
   loading.value = true;
   try {
@@ -373,7 +379,23 @@ async function fetchSchedules(start, end) {
     schedules.value = res.data.data
   } catch (err) {
     console.error('获取日程失败:', err)
-    // 实际项目中这里应该添加用户提示
+  } finally {
+    loading.value = false; 
+  }
+}
+
+// 获取日历页日程数据
+async function fetchEvents(date) {
+  loading.value = true;
+  try {
+    const params = {
+      start: formatDateObjToStr(date),
+      end: formatDateObjToStr(date)
+    }
+    const res = await request.get('/schedule/fetch', { params })
+    events.value = res.data.data
+  } catch (err) {
+    console.error('获取日程失败:', err)
   } finally {
     loading.value = false; 
   }
@@ -390,28 +412,11 @@ watch(dateRange, (newVal) => {
     fetchSchedules(newVal[0], newVal[1])
   }
 })
-
-const filteredSchedules = computed(() => {
-  return schedules.value
+watch(selectedDate, (newVal) => {
+  if (newVal) {
+    fetchEvents(newVal)
+  }
 })
-
-const selectedDate = ref(new Date());
-
-const filteredEvents = computed(() => {
-  if (!selectedDate.value) return []
-  const dateStr = selectedDate.value.toISOString().split('T')[0]
-  return schedules.value.filter(ev => ev.start?.startsWith(dateStr))
-})
-
-const timelineEvents = computed(() =>
-  filteredEvents.value
-    .slice()
-    .sort((a, b) => a.start.localeCompare(b.start))
-    .map(ev => ({
-      ...ev,
-      content: ev
-    }))
-);
 
 function eventTimeRange(event) {
   if (event.end && event.end !== event.start) {
@@ -421,12 +426,19 @@ function eventTimeRange(event) {
   }
 }
 
+// function formatDateObjToStr(dateObj) {
+//   if (!dateObj) return '';
+//   const y = dateObj.getFullYear();
+//   const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+//   const d = dateObj.getDate().toString().padStart(2, '0');
+//   return `${y}-${m}-${d}`;
+// }
+
 function formatDateObjToStr(dateObj) {
   if (!dateObj) return '';
-  const y = dateObj.getFullYear();
-  const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-  const d = dateObj.getDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  // 转换为北京时间 (UTC+8)
+  const beijingTime = new Date(dateObj.getTime() + 8 * 60 * 60 * 1000);
+  return beijingTime.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 function openCreateDialog() {
@@ -545,6 +557,8 @@ async function onSubmit() {
   }finally {
     submitLoading.value = false; 
     showDialog.value = false;
+    fetchSchedules(dateRange.value[0], dateRange.value[1]);
+    fetchEvents(selectedDate.value);
   }
 }
 
@@ -574,6 +588,8 @@ async function confirmDelete() {
     showDeleteDialog.value = false;
     scheduleToDelete.value = null;
     submitLoading.value = false;
+    fetchSchedules(dateRange.value[0], dateRange.value[1]);
+    fetchEvents(selectedDate.value);
   }
 }
 
@@ -602,54 +618,110 @@ function openLLMDialog() {
   llmResults.value = [];
 }
 
-// 模拟 LLM 返回多个日程，包含结束时间与链接
-function handleLLMCreate() {
-  // 真实情况请替换为 LLM API 调用
-  // 给每个日程加唯一 _uid（便于渲染 key）
-  llmResults.value = [
-    {
-      _uid: Math.random().toString(36).slice(2),
-      title: '看牙医',
-      start_date: '2025-04-19',
-      start_time: '15:00',
-      end_date: '2025-04-19',
-      end_time: '16:00',
-      location: '医院',
-      link: 'https://meet.example.com/dental',
-      description: '牙科预约'
-    },
-    {
-      _uid: Math.random().toString(36).slice(2),
-      title: '和朋友吃饭',
-      start_date: '2025-04-19',
-      start_time: '19:00',
-      end_date: '2025-04-19',
-      end_time: '21:00',
-      location: '餐厅',
-      link: '',
-      description: '聚餐'
+async function handleLLMCreate() {
+  if (!llmInput.value.trim()) {
+    toast.add({
+      severity: 'warn',
+      summary: '警告',
+      detail: '请输入自然语言描述',
+      life: 3000
+    });
+    return;
+  }
+  try {
+    llmResults.value = [];
+    const res = await request.post('/llm/createSchedule', {
+      paragraph: llmInput.value
+    });
+    if (Array.isArray(res.data)) {
+      llmResults.value = res.data.map(item => ({
+        _uid: Math.random().toString(36).slice(2),
+        title: item.topic || '',
+        location: item.location || '',
+        link: (item.links && item.links.length) ? item.links[0] : '',
+        description: item.notes || '',
+        start_date: item.startTime ? item.startTime.split(' ')[0] : '',
+        start_time: item.startTime ? item.startTime.split(' ')[1].slice(0,5) : '',
+        end_date: item.endTime ? item.endTime.split(' ')[0] : '',
+        end_time: item.endTime ? item.endTime.split(' ')[1].slice(0,5) : ''
+      }));
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: '生成失败',
+        detail: 'AI未解析到日程，请重试',
+        life: 3000
+      });
     }
-  ];
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: '生成失败',
+      detail: err.response?.data?.message || err.message,
+      life: 4000
+    });
+  }
 }
 
 function removeLLMSchedule(idx) {
   llmResults.value.splice(idx, 1);
 }
 
-function confirmLLMSchedules() {
-  for (const sch of llmResults.value) {
-    if (!sch.title || !sch.start_date || !sch.start_time || !sch.end_date || !sch.end_time) continue;
-    schedules.value.push({
-      id: Date.now() + Math.random(),
+async function confirmLLMSchedules() {
+  // 校验
+  const validSchedules = llmResults.value.filter(
+    sch => sch.title && sch.start_date && sch.start_time && sch.end_date && sch.end_time
+  );
+  if (!validSchedules.length) {
+    toast.add({
+      severity: 'warn',
+      summary: '警告',
+      detail: '没有可用日程',
+      life: 3000
+    });
+    return;
+  }
+
+  const payload = {
+    schedules: validSchedules.map(sch => ({
       title: sch.title,
       start: `${sch.start_date}T${sch.start_time}`,
       end: `${sch.end_date}T${sch.end_time}`,
-      location: sch.location || '',
-      link: sch.link || '',
-      description: sch.description || ''
+      location: sch.location,
+      link: sch.link,
+      description: sch.description
+    }))
+  };
+
+  try {
+    const res = await request.post('/schedule/batch_create', payload);
+    if (res.data.code === 201) {
+      // 直接刷新日程数据
+      showLLMDialog.value = false;
+      await fetchSchedules(dateRange.value[0], dateRange.value[1]);
+      await fetchEvents(selectedDate.value);
+      toast.add({
+        severity: 'success',
+        summary: '成功',
+        detail: '批量创建成功',
+        life: 3000
+      });
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: '错误',
+        detail: res.data.message || '批量创建失败',
+        life: 4000
+      });
+    }
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: '错误',
+      detail: err.response?.data?.message || err.message,
+      life: 4000
     });
   }
-  showLLMDialog.value = false;
 }
 
 </script>
