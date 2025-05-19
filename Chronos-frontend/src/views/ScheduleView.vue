@@ -38,11 +38,11 @@
         <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
         <p class="mt-2 text-gray-500">加载中...</p>
       </div>
-      <div v-else-if="filteredSchedules.length === 0" class="text-gray-500 text-center mt-8">
+      <div v-else-if="schedules.length === 0" class="text-gray-500 text-center mt-8">
         暂无日程
       </div>
       <div v-else class="grid gap-4">
-        <Card v-for="event in filteredSchedules" :key="event.id" class="w-full">
+        <Card v-for="event in schedules" :key="event.id" class="w-full">
           <template #title>
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span>{{ event.title }}</span>
@@ -87,10 +87,14 @@
         </div>
         <!-- Timeline 区域 -->
         <div class="flex-1 min-w-0">
-          <div v-if="filteredEvents.length === 0" class="text-gray-500 text-center mt-8">
+          <div v-if="loading" class="text-center py-8">
+            <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
+            <p class="mt-2 text-gray-500">加载中...</p>
+          </div>
+          <div v-else-if="events.length === 0" class="text-gray-500 text-center mt-8">
             当天暂无日程
           </div>
-          <Timeline :value="timelineEvents" align="alternate" v-else>
+          <Timeline :value="events" align="alternate" v-else>
             <template #content="slotProps">
               <Card class="w-full">
                 <template #title>
@@ -317,13 +321,15 @@ const loading = ref(false);
 const submitLoading = ref(false);
 const toast = useToast();
 
-const schedules = ref([]);
-const dateRange = ref([]);     // 修正后的日期范围初始化
 const viewMode = ref('list');
 const viewModes = [
   { label: '列表', value: 'list', icon: 'pi pi-list' },
   { label: '日历', value: 'calendar', icon: 'pi pi-calendar' }
 ];
+const schedules = ref([]);
+const dateRange = ref([]);
+const events = ref([]);
+const selectedDate = ref(new Date());
 
 const showDialog = ref(false);     // 开启创建/编辑框
 const dialogMode = ref('create');
@@ -360,7 +366,7 @@ function getDefaultDateRange() {
   ];
 }
 
-// 获取日程数据
+// 获取列表页日程数据
 async function fetchSchedules(start, end) {
   loading.value = true;
   try {
@@ -373,7 +379,23 @@ async function fetchSchedules(start, end) {
     schedules.value = res.data.data
   } catch (err) {
     console.error('获取日程失败:', err)
-    // 实际项目中这里应该添加用户提示
+  } finally {
+    loading.value = false; 
+  }
+}
+
+// 获取日历页日程数据
+async function fetchEvents(date) {
+  loading.value = true;
+  try {
+    const params = {
+      start: formatDateObjToStr(date),
+      end: formatDateObjToStr(date)
+    }
+    const res = await request.get('/schedule/fetch', { params })
+    events.value = res.data.data
+  } catch (err) {
+    console.error('获取日程失败:', err)
   } finally {
     loading.value = false; 
   }
@@ -390,28 +412,11 @@ watch(dateRange, (newVal) => {
     fetchSchedules(newVal[0], newVal[1])
   }
 })
-
-const filteredSchedules = computed(() => {
-  return schedules.value
+watch(selectedDate, (newVal) => {
+  if (newVal) {
+    fetchEvents(newVal)
+  }
 })
-
-const selectedDate = ref(new Date());
-
-const filteredEvents = computed(() => {
-  if (!selectedDate.value) return []
-  const dateStr = selectedDate.value.toISOString().split('T')[0]
-  return schedules.value.filter(ev => ev.start?.startsWith(dateStr))
-})
-
-const timelineEvents = computed(() =>
-  filteredEvents.value
-    .slice()
-    .sort((a, b) => a.start.localeCompare(b.start))
-    .map(ev => ({
-      ...ev,
-      content: ev
-    }))
-);
 
 function eventTimeRange(event) {
   if (event.end && event.end !== event.start) {
@@ -421,12 +426,19 @@ function eventTimeRange(event) {
   }
 }
 
+// function formatDateObjToStr(dateObj) {
+//   if (!dateObj) return '';
+//   const y = dateObj.getFullYear();
+//   const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+//   const d = dateObj.getDate().toString().padStart(2, '0');
+//   return `${y}-${m}-${d}`;
+// }
+
 function formatDateObjToStr(dateObj) {
   if (!dateObj) return '';
-  const y = dateObj.getFullYear();
-  const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-  const d = dateObj.getDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  // 转换为北京时间 (UTC+8)
+  const beijingTime = new Date(dateObj.getTime() + 8 * 60 * 60 * 1000);
+  return beijingTime.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 function openCreateDialog() {
@@ -545,6 +557,8 @@ async function onSubmit() {
   }finally {
     submitLoading.value = false; 
     showDialog.value = false;
+    fetchSchedules(dateRange.value[0], dateRange.value[1]);
+    fetchEvents(selectedDate.value);
   }
 }
 
@@ -574,6 +588,8 @@ async function confirmDelete() {
     showDeleteDialog.value = false;
     scheduleToDelete.value = null;
     submitLoading.value = false;
+    fetchSchedules(dateRange.value[0], dateRange.value[1]);
+    fetchEvents(selectedDate.value);
   }
 }
 

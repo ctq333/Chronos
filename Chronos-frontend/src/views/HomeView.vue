@@ -8,7 +8,20 @@
       <!-- 今日事项 -->
       <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col">
         <h3 class="text-lg font-semibold text-gray-800 text-center mb-4">今日事项</h3>
+        <div v-if="taskLoading" class="flex-1 flex items-center justify-center">
+          <div class="text-center py-8">
+            <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
+            <p class="mt-2 text-gray-500">加载中...</p>
+          </div>
+        </div>
+        <div v-else-if="!taskLoading && tasks.length === 0" class="flex-1 flex items-center justify-center">
+          <div class="text-center py-8 text-gray-500">
+            <i class="pi pi-inbox" style="font-size: 2rem"></i>
+            <p class="mt-2">暂无安排</p>
+          </div>
+        </div>
         <OrderList 
+          v-else
           v-model="tasks" 
           dataKey="id"
           :listStyle="{ 'height': '60vh', 'max-height': '60vh'}"
@@ -21,7 +34,7 @@
                 <div class="flex-1">
                   <div class="font-medium text-gray-800">{{ slotProps.item.title }}</div>
                   <div class="text-sm text-gray-500 mt-1">
-                    截止: {{ formatRelativeDate(slotProps.item.deadline) }}
+                    截止: {{ formatRelativeDate(slotProps.item.dueDate) }}
                   </div>
                 </div>
               </div>
@@ -33,8 +46,21 @@
       <!-- 今日日程 -->
       <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col">
         <h3 class="text-lg font-semibold text-gray-800 text-center mb-4">今日日程</h3>
+        <div v-if="scheduleLoading" class="flex-1 flex items-center justify-center">
+          <div class="text-center py-8">
+            <i class="pi pi-spinner pi-spin text-primary" style="font-size: 1.5rem"></i>
+            <p class="mt-2 text-gray-500">加载中...</p>
+          </div>
+        </div>
+        <div v-else-if="!scheduleLoading && schedules.length === 0" class="flex-1 flex items-center justify-center">
+          <div class="text-center py-8 text-gray-500">
+            <i class="pi pi-inbox" style="font-size: 2rem"></i>
+            <p class="mt-2">暂无安排</p>
+          </div>
+        </div>
         <OrderList 
-          v-model="sortedSchedules" 
+          v-else
+          v-model="schedules" 
           dataKey="id"
           :listStyle="{ 'height': '60vh', 'max-height': '60vh' }"
           class="border-t border-gray-100 flex-1"
@@ -62,96 +88,73 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import OrderList from 'primevue/orderlist';
+import request from '@/utils/request';
+import axios from 'axios';
+import { useStore } from 'vuex'
 
-const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
+const scheduleLoading = ref(false);
+const schedules = ref([]);
+const taskLoading = ref(false);
+const tasks = ref([]);
+const store = useStore();
 
-// 示例数据
-const tasks = ref([
-  { 
-    id: 1, 
-    title: '项目需求文档提交', 
-    deadline: '2025-04-18'
-  },
-  { 
-    id: 2, 
-    title: '季度汇报终稿', 
-    deadline: '2025-04-20'
-  },
-  { 
-    id: 3, 
-    title: '网络学习文档整理', 
-    deadline: '2025-05-08'
-  },
-  // 新增任务样例
-  { 
-    id: 4,
-    title: '系统测试计划审核',
-    deadline: '2025-04-25'
-  },
-  { 
-    id: 5,
-    title: 'UI界面优化方案确认',
-    deadline: '2025-05-02'
-  },
-  { 
-    id: 6,
-    title: '后端代码审查会议',
-    deadline: '2025-04-22'
-  },
-  { 
-    id: 7,
-    title: '生产环境部署计划',
-    deadline: '2025-04-28'
+async function fetchTasks() {
+  taskLoading.value = true;
+  try {
+    const res = await axios.get('/api/task/home', {
+      headers: {
+        'Authorization': 'Bearer ' + store.state.token
+      }
+    })
+    if (res.data.code === 200) {
+      tasks.value = res.data.data.tasks
+    } else {
+      alert(res.data.message || '获取事项失败')
+    }
+  } catch (err) {
+    alert('获取事项错误: ' + (err.response?.data?.message || err.message))
+  } finally {
+    taskLoading.value = false; 
   }
-]);
+}
 
-const schedules = ref([
-  { 
-    id: 1, 
-    title: '产品设计评审', 
-    start: '2025-04-19T21:30',
-    end: '2025-04-19T22:00'
-  },
-  { 
-    id: 2, 
-    title: '客户演示会议', 
-    start: '2025-04-19T14:00',
-    end: '2025-04-19T15:30'
-  },
-  { 
-    id: 3, 
-    title: '晨间例会', 
-    start: '2025-04-19T08:30',
-    end: '2025-04-19T09:00'
-  },
-  // 新增日程样例
-  { 
-    id: 4,
-    title: '团队头脑风暴',
-    start: '2025-04-19T10:00',
-    end: '2025-04-19T11:30'
-  },
-  { 
-    id: 5,
-    title: '新需求评审会',
-    start: '2025-04-19T16:00',
-    end: '2025-04-19T17:00'
-  },
-  { 
-    id: 6,
-    title: '技术培训分享',
-    start: '2025-04-19T19:00',
-    end: '2025-04-19T20:30'
-  },
-  { 
-    id: 7,
-    title: '周工作总结会',
-    start: '2025-04-19T22:30',
-    end: '2025-04-19T23:00'
+async function fetchSchedules() {
+  scheduleLoading.value = true;
+  try {
+    const params = {
+      start: formatDateObjToStr(new Date()),
+      end: formatDateObjToStr(new Date())
+    }
+    const res = await request.get('/schedule/fetch', { params })
+    schedules.value = res.data.data
+  } catch (err) {
+    console.error('获取日程失败:', err)
+  } finally {
+    scheduleLoading.value = false; 
   }
-]);
+}
+
+onMounted(() => {
+  fetchTasks();
+  fetchSchedules();
+})
+
+// function formatDateObjToStr(dateObj) {
+//   if (!dateObj) return '';
+//   const y = dateObj.getFullYear();
+//   const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+//   const d = dateObj.getDate().toString().padStart(2, '0');
+//   return `${y}-${m}-${d}`;
+// }
+
+function formatDateObjToStr(dateObj) {
+  if (!dateObj) return '';
+  // 转换为北京时间 (UTC+8)
+  const beijingTime = new Date(dateObj.getTime() + 8 * 60 * 60 * 1000);
+  return beijingTime.toISOString().slice(0, 10); // YYYY-MM-DD
+}
 
 // 格式化相对日期
 const formatRelativeDate = (dateStr) => {
@@ -186,16 +189,6 @@ const formatTimeRange = (item) => {
 const isPastEvent = (event) => {
   return new Date(event.end) < new Date();
 };
-
-// 排序后的日程（进行中的排前）
-const sortedSchedules = computed(() => {
-  return [...schedules.value].sort((a, b) => {
-    const aPast = isPastEvent(a);
-    const bPast = isPastEvent(b);
-    if (aPast === bPast) return 0;
-    return aPast ? 1 : -1;
-  });
-});
 </script>
 
 <style scoped>
