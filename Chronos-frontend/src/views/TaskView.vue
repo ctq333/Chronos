@@ -330,7 +330,7 @@
 					</div>
 					<div class="flex justify-end gap-2 mt-4">
 						<Button label="取消" icon="pi pi-times" severity="secondary" @click="showSmartSubTaskDialog=false" />
-						<Button label="全部添加" icon="pi pi-check" @click="confirmSmartSubTasks" :disabled="!smartSubTaskList.length" />
+						<Button label="全部添加" icon="pi pi-check" @click="confirmSmartSubTasks" :disabled="!smartSubTaskList.length" :loading="submitLoading"/>
 					</div>
 				</div>
 				<div v-else class="text-gray-500 text-center py-6">未获取到可用子任务</div>
@@ -796,30 +796,82 @@ function openSmartSubTaskDialog(task) {
 	smartSubTaskList.value = [];
 	showSmartSubTaskDialog.value = true;
 	smartSubTaskLoading.value = true;
-	setTimeout(() => {
-		smartSubTaskList.value = [
-			{ _uid: Math.random().toString(36).slice(2), title: 'AI子任务1' },
-			{ _uid: Math.random().toString(36).slice(2), title: 'AI子任务2' },
-			{ _uid: Math.random().toString(36).slice(2), title: 'AI子任务3' }
-		];
-		smartSubTaskLoading.value = false;
-	}, 1200);
+	generateSubTasksWithLLM(task);
+}
+
+async function generateSubTasksWithLLM(task) {
+  try {
+    // 只保留必要字段
+    const taskForLLM = {
+      id: task.id,
+      title: task.title,
+      planDate: task.planDate,
+      dueDate: task.dueDate,
+      notes: task.notes,
+      // 你可按需补充
+    };
+    const res = await axios.post(
+      '/api/llm/generateSubTasks',
+      { task: taskForLLM },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+    if(res.data.code === 200 && Array.isArray(res.data.data)){
+      smartSubTaskList.value = res.data.data.map(sub => ({
+        _uid: Math.random().toString(36).slice(2),
+        title: sub.title
+      }));
+    }else{
+      alert('大模型未能生成子任务');
+    }
+  } catch (err) {
+    alert('智能生成失败: ' + (err.response?.data?.message || err.message));
+  } finally {
+    smartSubTaskLoading.value = false;
+  }
 }
 function removeSmartSubTask(idx) {
 	smartSubTaskList.value.splice(idx, 1);
 }
-function confirmSmartSubTasks() {
-	const idx = tasks.value.findIndex(t => t.id === currentSmartSubTaskParentId.value);
-	if (idx !== -1) {
-		const nextId = () => Date.now() + Math.random();
-		const newSubs = smartSubTaskList.value.map(sub => ({
-			id: nextId(),
-			title: sub.title,
-			completed: false
-		}));
-		tasks.value[idx].subtasks = (tasks.value[idx].subtasks || []).concat(newSubs);
-	}
-	showSmartSubTaskDialog.value = false;
+async function confirmSmartSubTasks() {
+  const idx = tasks.value.findIndex(t => t.id === currentSmartSubTaskParentId.value);
+  if (idx === -1) return;
+
+  // 只取 title 字段
+  const newSubs = smartSubTaskList.value
+    .map(sub => ({ title: (sub.title || "").trim() }))
+    .filter(sub => !!sub.title);
+
+  if (!newSubs.length) {
+    alert('请填写子任务标题');
+    return;
+  }
+
+  submitLoading.value = true;
+  try {
+    const res = await axios.post(
+      `/api/task/${currentSmartSubTaskParentId.value}/add_subtasks`,
+      { subtasks: newSubs },
+      { headers: { Authorization: 'Bearer ' + store.state.token } }
+    );
+    if (res.data.code === 201 && Array.isArray(res.data.data)) {
+      // 更新前端数据
+      tasks.value[idx].subtasks = (tasks.value[idx].subtasks || []).concat(
+        res.data.data.map(sub => ({
+          id: sub.id,
+          title: sub.title,
+          completed: !!sub.completed // 后端可返回0/1，前端转bool
+        }))
+      );
+      showSmartSubTaskDialog.value = false;
+      smartSubTaskList.value = [];
+    } else {
+      alert(res.data.message || '添加失败');
+    }
+  } catch (err) {
+    alert('网络/服务器错误：' + (err.response?.data?.message || err.message));
+  } finally {
+    submitLoading.value = false;
+  }
 }
 
 const showLLMDialog = ref(false);
