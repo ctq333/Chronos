@@ -1,55 +1,134 @@
+import json
 from flask import Blueprint, jsonify, request
+from datetime import datetime, date, timedelta
+from sqlalchemy import extract
+from app import db
+from app.models.schedule import Schedule
+from app.models.task import Task
+from app.models.monthly_report import MonthlyReport
+from app.routes.auth_routes import login_required
 from app.services.genai_service import generate_content
 from app.utils import extract_json_from_string
 
-EVENT_PROMPT_TEMPLATE = """
-Now you will serve as a backend. You should reply to me only in JSON format, no extra sentences. I will send you a JSON template to fill in, along with a paragraph, which can contain multiple events, each event can include a topic, date and time range, location, website links. You need to recognize those things in the paraghaph accurately, without any mistake and return them in JSON. JSON fields can be left empty if not recognized, except for startTime and endTime, which should be filled with the recognized date, and you can choose an proper start time. If the event mentioned in text is not a one or multi-day event and also a start time is recognized but no end time is recognized, set end time at one hour later. The language you fill into JSON should be the language you recognized in the text. 
+bp = Blueprint("llm", __name__, url_prefix="/llm")
 
+MONTHLY_REPORT_PROMPT_TEMPLATE = """
+Now you will serve as a backend. You should reply to me only in JSON format, no extra sentences. I will send you a JSON template to fill in, along with json content contains tasks and schedules, which is schedules user engaged and tasks user completed last month. You need to summraize what the user done last month, like what this user have accomplished, what this user have postponed, or anything relavent, then write a monthly report. The report should be write with plain text in multiple paragraph, rather than markdown format. The human language you used to fill into JSON should be the language you recognized in provided json, if multiple language are used in provided json, choose the language that is used most.
 JSON Schema:
 [
     {
-        "topic": str,
-        "startTime": str,    # Use "yyyy-mm-dd hh:mm" format; if no time is recognized, choose a proper start time. If no date is recognized, use today's date.
-        "endTime": str,      # Use "yyyy-mm-dd hh:mm" format; if no end time is found, set it to "23:59" or a more proper one.
-        "location": str,     # Recognized location in the text.
-        "links": list[str],  # List of recognized links in the text.
-        "notes": str         # Key points for one single event summarized as a string.
-    },
-    {
-        "topic": str,
-        "startTime": str,    # Use "yyyy-mm-dd hh:mm" format; if no time is recognized, choose a proper start time. If no date is recognized, use today's date.
-        "endTime": str,      # Use "yyyy-mm-dd hh:mm" format; if no end time is found, set it to "23:59" or a more proper one.
-        "location": str,     # Recognized location in the text.
-        "links": list[str],  # List of recognized links in the text.
-        "notes": str         # Key points one single event summarized as a string,.
-    },
-    ...
+        "content": str  # The content of the monthly report
+    }
 ]
-
-also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the paragraph:
+also no ```json``` or ```text``` or ```python``` in the response, just pure json, the following is the json data contains schedule and task:
 """
-# Create a blueprint for the main routes
-bp = Blueprint("llm", __name__, url_prefix="/llm")
 
-@bp.route("/createSchedule", methods=["POST"])
-def process_input():
+def get_month_start_end(dt=None):
+    """返回本月第一天和最后一天"""
+    if dt is None:
+        dt = date.today()
+    start = dt.replace(day=1)
+    # 下月1日-1天
+    if start.month == 12:
+        next_month = start.replace(year=start.year + 1, month=1, day=1)
+    else:
+        next_month = start.replace(month=start.month + 1, day=1)
+    end = next_month - timedelta(days=1)
+    return start, end
+
+@bp.route("/generateMonthlyReport", methods=["POST"])
+@login_required()
+def generate_monthly_report(user):
+    today = date.today()
+    month_start, month_end = get_month_start_end(today)
+
+    # 查询本月所有Tasks（plan_date在本月）
+    tasks = Task.query.filter(
+        Task.user_id == user.id,
+        extract('year', Task.plan_date) == today.year,
+        extract('month', Task.plan_date) == today.month
+    ).all()
+    # 查询本月所有Schedules（start_time在本月）
+    schedules = Schedule.query.filter(
+        Schedule.user_id == user.id,
+        extract('year', Schedule.start_time) == today.year,
+        extract('month', Schedule.start_time) == today.month
+    ).all()
+
+    tasks_json = [{
+        "id": t.id,
+        "title": t.title,
+        "planDate": t.plan_date.strftime("%Y-%m-%d") if t.plan_date else "",
+        "dueDate": t.due_date.strftime("%Y-%m-%d") if t.due_date else "",
+        "priority": t.priority,
+        "notes": t.notes,
+        "progress": t.progress,
+        "status": t.status,
+        "tags": t.tag.split(",") if t.tag else []
+    } for t in tasks]
+
+    schedules_json = [{
+        "id": s.id,
+        "title": s.title,
+        "description": s.description,
+        "startTime": s.start_time.strftime("%Y-%m-%d %H:%M") if s.start_time else "",
+        "endTime": s.end_time.strftime("%Y-%m-%d %H:%M") if s.end_time else "",
+        "location": s.location,
+        "link": s.link
+    } for s in schedules]
+
+    input_json = {
+        "tasks": tasks_json,
+        "schedules": schedules_json
+    }
+    input_json_str = json.dumps(input_json, ensure_ascii=False, indent=2)
+
+    prompt = MONTHLY_REPORT_PROMPT_TEMPLATE + input_json_str
     try:
-        # Get input paragraph
-        input_data = request.json
-        paragraph = input_data.get("paragraph", "")
-
-        if not paragraph:
-            return jsonify({"error": "No paragraph provided"}), 400
-
-        # Call the GenAI service
-        response_text = generate_content(EVENT_PROMPT_TEMPLATE, paragraph)
-
-        # Parse and return the JSON response
-        parsed_response = extract_json_from_string(response_text)
-        if parsed_response:
-            return jsonify(parsed_response)
+        llm_response = generate_content(prompt, "")
+        # 尝试从 LLM 返回抽取总结内容
+        content = ""
+        report_objs = extract_json_from_string(llm_response)
+        if isinstance(report_objs, list) and report_objs:
+            content = report_objs[0].get("content", "")
+        elif isinstance(report_objs, dict):
+            content = report_objs.get("content", "")
         else:
-            return jsonify({"error": "Invalid JSON format in AI response", "details": response_text}), 500
-
+            content = str(llm_response)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"code": 500, "message": "LLM生成失败", "err": str(e)}), 500
+
+    # 写入 monthly_report
+    report = MonthlyReport(
+        user_id=user.id,
+        content=content,
+        start_date=month_start,
+        end_date=month_end
+    )
+    db.session.add(report)
+    db.session.commit()
+    
+
+    return jsonify({
+        "code": 200,
+        "content": content,
+        "start_date": month_start.isoformat(),
+        "end_date": month_end.isoformat()
+    })
+
+@bp.route("/monthly/history", methods=["GET"])
+@login_required()
+def get_monthly_reports(user):
+    reports = (
+        MonthlyReport.query
+        .filter_by(user_id=user.id)
+        .order_by(MonthlyReport.start_date.desc())
+        .all()
+    )
+    return jsonify([
+        {
+            "id": r.id,
+            "month": f"{r.start_date.strftime('%Y-%m')}",
+            "content": r.content
+        } for r in reports
+    ])

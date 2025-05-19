@@ -6,4 +6,4 @@ from .schedule import Schedule
 from .task import Task
 from .schedule_invitation import ScheduleInvitation
 from .subtask import SubTask
-from .report import Report
+from .monthly_report import MonthlyReport

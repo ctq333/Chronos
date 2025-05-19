@@ -19,7 +19,7 @@ def create_app():
     db.init_app(app)
 
     # 在初始化 db 之后，再导入模型和蓝图，避免循环导入
-    from app.models import User, Schedule, Task, ScheduleInvitation, SubTask, Report
+    from app.models import User, Schedule, Task, ScheduleInvitation, SubTask, MonthlyReport
 
     # Register blueprints (导入蓝图对象并注册)
     from app.routes import llm_routes, admin_routes, auth_routes, task_routes, schedule_routes, invitation_routes
