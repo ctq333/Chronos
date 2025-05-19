@@ -12,8 +12,6 @@ current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 TIME_PROMPT_TEMPLATE = f"""
 The current time is {current_time_str}. If the date is not provided, please use that time as a reference to determine the date, month, year, and time.
 """
-# Prompt template for GenAI
-
 
 def generate_content(prompt, content):
     """Generate content using GenAI."""
