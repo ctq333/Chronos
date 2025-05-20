@@ -21,7 +21,7 @@ def get_schedule_list(user):
                 Schedule.start_time < end_datetime
             )
         except ValueError:
-            return jsonify({"success": False, "msg": "日期格式错误"}), 400
+            return jsonify({"code": 400, "message": "日期格式错误"})
     schedules = query.order_by(Schedule.start_time).all()
 
     data = []
@@ -35,7 +35,7 @@ def get_schedule_list(user):
             "location": sch.location,
             "link": sch.link
         })
-    return jsonify({"success": True, "data": data})
+    return jsonify({"code": 200, "data": data, "message": "日程获取成功"})
 
 
 @bp.route("/create", methods=["POST"])
@@ -47,7 +47,7 @@ def create_schedule(user):
         start_time = datetime.fromisoformat(data['start'])
         end_time = datetime.fromisoformat(data['end'])
     except ValueError:
-        return jsonify({"success": False, "msg": "日期格式错误"}), 400
+        return jsonify({"code": 400, "message": "日期格式错误"})
  
     schedule = Schedule(
         user_id=user.id,
@@ -63,7 +63,7 @@ def create_schedule(user):
         db.session.add(schedule)
         db.session.commit()
         return jsonify({
-            "success": True,
+            "code": 200, 
             "data": {
                 "id": schedule.id,
                 "title": schedule.title,
@@ -72,11 +72,12 @@ def create_schedule(user):
                 "end": schedule.end_time.isoformat()[:16],
                 "location": schedule.location,
                 "link": schedule.link
-            }
+            },
+            "message": "日程创建成功"
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "msg": "创建日程失败"}), 500
+        return jsonify({"code": 500, "message": "日程创建失败"})
  
 @bp.route("/update/<int:schedule_id>", methods=["POST"])
 @login_required()
@@ -87,11 +88,11 @@ def update_schedule(user, schedule_id):
         start_time = datetime.fromisoformat(data['start'])
         end_time = datetime.fromisoformat(data['end'])
     except ValueError:
-        return jsonify({"success": False, "msg": "日期格式错误"}), 400
+        return jsonify({"code": 400, "message": "日期格式错误"})
  
     schedule = Schedule.query.filter_by(id=schedule_id, user_id=user.id).first()
     if not schedule:
-        return jsonify({"success": False, "msg": "未找到该日程"}), 404
+        return jsonify({"code": 404, "message": "未找到该日程"})
  
     schedule.title = data['title']
     schedule.description = data.get('description')
@@ -103,7 +104,7 @@ def update_schedule(user, schedule_id):
     try:
         db.session.commit()
         return jsonify({
-            "success": True,
+            "code": 200, 
             "data": {
                 "id": schedule.id,
                 "title": schedule.title,
@@ -112,11 +113,12 @@ def update_schedule(user, schedule_id):
                 "end": schedule.end_time.isoformat()[:16],
                 "location": schedule.location,
                 "link": schedule.link
-            }
+            },
+            "message": "日程更新成功"
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "msg": "更新日程失败"}), 500
+        return jsonify({"code": 500, "message": "更新日程失败"})
     
 
 @bp.route("/delete/<int:schedule_id>", methods=["DELETE"])
@@ -130,9 +132,9 @@ def delete_schedule(user, schedule_id):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({"code":409,"message": "日程删除失败"})
+        return jsonify({"code":409, "message": "日程删除失败"})
 
-    return jsonify({"code":200,"message": "日程删除成功"})
+    return jsonify({"code":200, "message": "日程删除成功"})
 
 
 @bp.route("/invite", methods=["POST"])
@@ -145,7 +147,7 @@ def invite(user):
 
     receiver = db.session.query(User).filter_by(username=receiver_name).first()
     if not receiver:
-        return jsonify({"code": 409, "message": "未找到该用户"}), 400
+        return jsonify({"code": 409, "message": "未找到该用户"})
 
     invitation = ScheduleInvitation(
         schedule_id = schedule_id,
@@ -159,14 +161,16 @@ def invite(user):
         db.session.add(invitation)
         db.session.commit()
         return jsonify({
-            "success": True,
+            "code": 200, 
             "data": {
-            }
+            },
+            "message": "邀请发送成功"
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "msg": "邀请发送失败"}), 500
+        return jsonify({"code": 500, "message": "邀请发送失败"})
     
+
 @bp.route('/batch_create', methods=['POST'])
 @login_required()
 def batch_create(current_user):

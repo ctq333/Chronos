@@ -376,7 +376,16 @@ async function fetchSchedules(start, end) {
     }
     
     const res = await request.get('/schedule/fetch', { params })
-    schedules.value = res.data.data
+    if(res.data.code === 200){
+      schedules.value = res.data.data
+    }else{
+      toast.add({
+        severity: 'error',
+        summary: '错误',
+        detail: res.data.message,
+        life: 3000
+      });
+    }
   } catch (err) {
     console.error('获取日程失败:', err)
   } finally {
@@ -393,7 +402,16 @@ async function fetchEvents(date) {
       end: formatDateObjToStr(date)
     }
     const res = await request.get('/schedule/fetch', { params })
-    events.value = res.data.data
+    if(res.data.code === 200){
+      events.value = res.data.data
+    }else{
+      toast.add({
+        severity: 'error',
+        summary: '错误',
+        detail: res.data.message,
+        life: 3000
+      });
+    }
   } catch (err) {
     console.error('获取日程失败:', err)
   } finally {
@@ -495,8 +513,8 @@ async function onSubmit() {
   const timeFormatRegex = /^([01]?[0-9]|2[0-3])(:([0-5][0-9]))?$/;  // 验证时间格式
   if (!timeFormatRegex.test(form.value.startTime) || !timeFormatRegex.test(form.value.endTime)) {
     toast.add({
-      severity: 'error',
-      summary: '错误',
+      severity: 'warn',
+      summary: '警告',
       detail: '结束时间格式不正确，请使用 HH 或 HH:mm 格式，如 18 或 18:30',
       life: 3000
     });
@@ -526,28 +544,40 @@ async function onSubmit() {
     submitLoading.value = true;
     if (dialogMode.value === 'create') {
       const res = await request.post('/schedule/create', payload);
-      schedules.value.push(res.data.data);
-      toast.add({
-        severity: 'success',
-        summary: '成功',
-        detail: '日程创建成功',
-        life: 3000
-      });
+      if(res.data.code === 200){
+        toast.add({
+          severity: 'success',
+          summary: '成功',
+          detail: '日程创建成功',
+          life: 3000
+        });
+      }else{
+        toast.add({
+          severity: 'error',
+          summary: '错误',
+          detail: res.data.message,
+          life: 3000
+        });
+      }
     } else if (dialogMode.value === 'edit') {
       const res = await request.post(`/schedule/update/${editId.value}`, payload);
-      const idx = schedules.value.findIndex(s => s.id === editId.value);
-      if (idx !== -1) {
-        schedules.value[idx] = res.data.data;
+      if(res.data.code === 200){
+        toast.add({
+          severity: 'success',
+          summary: '成功',
+          detail: '日程更新成功',
+          life: 3000
+        });
+      }else{
+        toast.add({
+          severity: 'error',
+          summary: '错误',
+          detail: res.data.message,
+          life: 3000
+        });
       }
-      toast.add({
-        severity: 'success',
-        summary: '成功',
-        detail: '日程更新成功',
-        life: 3000
-      });
     }
   }catch (err) {
-    console.error('保存日程失败:', err);
     toast.add({
       severity: 'error',
       summary: '错误',
@@ -569,13 +599,22 @@ async function confirmDelete() {
   submitLoading.value = true;
   try {
     await request.delete(`/schedule/delete/${scheduleToDelete.value.id}`)
-    schedules.value = schedules.value.filter(s => s.id !== scheduleToDelete.value.id)
-    toast.add({
-      severity: 'success',
-      summary: '删除成功',
-      detail: `日程 "${scheduleToDelete.value.title}" 已删除`,
-      life: 3000
-    })
+    if(res.data.code === 200){
+      schedules.value = schedules.value.filter(s => s.id !== scheduleToDelete.value.id)
+      toast.add({
+        severity: 'success',
+        summary: '删除成功',
+        detail: `日程 "${scheduleToDelete.value.title}" 已删除`,
+        life: 3000
+      })
+    }else{
+      toast.add({
+        severity: 'error',
+        summary: '错误',
+        detail: res.data.message,
+        life: 3000
+      });
+    }
   } catch (err) {
     console.error('删除失败:', err)
     toast.add({
@@ -588,8 +627,6 @@ async function confirmDelete() {
     showDeleteDialog.value = false;
     scheduleToDelete.value = null;
     submitLoading.value = false;
-    fetchSchedules(dateRange.value[0], dateRange.value[1]);
-    fetchEvents(selectedDate.value);
   }
 }
 
@@ -603,8 +640,17 @@ async function sendInvite() {
       receiver : inviteUser.value
     };
     const res = await request.post(`/schedule/invite`, payload);
-    inviteResult.value = { success: true, message: `已向 ${inviteUser.value} 发送邀请` };
-    inviteUser.value = '';
+    if(res.data.code === 200){
+      inviteResult.value = { success: true, message: `已向 ${inviteUser.value} 发送邀请` };
+      inviteUser.value = '';
+    }else{
+      toast.add({
+        severity: 'error',
+        summary: '错误',
+        detail: res.data.message,
+        life: 3000
+      });
+    }
   } catch (e) {
     inviteResult.value = { success: false, message: '未找到该用户' };
   } finally {
