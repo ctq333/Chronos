@@ -210,4 +210,8 @@ const isPastEvent = (event) => {
 :deep(.p-3.transition-colors.bg-gray-50.text-gray-400){
   width: 100% !important;
 }
+
+:deep(.p-orderlist-controls) {
+  display: none !important;
+}
 </style>
