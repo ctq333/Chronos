@@ -91,16 +91,31 @@ def create_user(user):
         }), 200
 @bp.route("/users/<int:user_id>/status", methods=["PUT"])
 @login_required(admin_required=True)
-def update_user(user, user_id):
+def update_user(current_user, user_id):
     db = current_app.extensions["sqlalchemy"]
     from ..models.user import User
 
-    user = User.query.get_or_404(user_id)
+    target_user = User.query.get_or_404(user_id)
 
-    if user.status == 1:
-        user.status = 0
+
+    # 禁止禁用自己
+    if target_user.id == current_user.id:
+        return jsonify({
+            "code": 403,
+            "message": "不能修改自己的账户状态"
+        })
+    
+    # 禁止禁用其他管理员账户
+    if target_user.is_admin:
+        return jsonify({
+            "code": 403,
+            "message": "不能修改其他管理员账户状态"
+        }), 200
+
+    if current_user.status == 1:
+        current_user.status = 0
     else:
-        user.status = 1
+        current_user.status = 1
 
     try:
         db.session.commit()
