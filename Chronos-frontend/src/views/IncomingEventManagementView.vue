@@ -13,8 +13,8 @@
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
         currentPageReportTemplate="显示 {first} 到 {last} 共 {totalRecords} 条日程"
       >
-        <Column field="name" header="日程名称"></Column>
-        <Column field="timeRange" header="时间范围" sortable>
+        <Column field="name" header="主题"></Column>
+        <Column field="timeRange" header="时间" sortable>
           <template #body="{ data }">
             {{ formatTimeRange(data.startTime, data.endTime) }}
           </template>
@@ -81,7 +81,6 @@ async function fetchInvitations() {
     invitations.value = res.data.data
   } catch (err) {
     console.error('获取邀请失败:', err)
-    // 实际项目中这里应该添加用户提示
   } finally {
     loading.value = false; 
   }
@@ -105,14 +104,13 @@ async function acceptSchedule(id) {
   try {
     const res = await request.post('/invitation/accept', { id: id });
     if (res.data.code === 200) {
-      toast.add({ severity: 'success', summary: '成功', detail: '已接受日程邀请', life: 3000 });
-      await fetchInvitations();
+      toast.add({ severity: 'success', summary: '成功', detail: '已接收日程邀请', life: 3000 });
+      invitations.value = invitations.value.filter(s => s.id !== id)
     } else {
       toast.add({ severity: 'error', summary: '错误', detail: res.data.message, life: 3000 });
     }
   } catch (err) {
     console.error('接受邀请失败:', err);
-    toast.add({ severity: 'error', summary: '错误', detail: '操作失败，请稍后重试', life: 3000 });
   } finally {
     loading_id.value = null;
     loading_mode.value = null;
@@ -127,13 +125,12 @@ async function rejectSchedule(id) {
     const res = await request.post('/invitation/reject', { id: id });
     if (res.data.code === 200) {
       toast.add({ severity: 'success', summary: '成功', detail: '已拒绝日程邀请', life: 3000 });
-      await fetchInvitations();
+      invitations.value = invitations.value.filter(s => s.id !== id)
     } else {
       toast.add({ severity: 'error', summary: '错误', detail: res.data.message, life: 3000 });
     }
   } catch (err) {
     console.error('接受邀请失败:', err);
-    toast.add({ severity: 'error', summary: '错误', detail: '操作失败，请稍后重试', life: 3000 });
   } finally {
     loading_id.value = null;
     loading_mode.value = null;

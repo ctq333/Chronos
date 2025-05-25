@@ -138,26 +138,26 @@
       <form @submit.prevent="onSubmit">
         <div class="mb-3">
           <label>主题 *</label>
-          <InputText v-model="form.title" maxlength="50" required class="w-full" />
+          <InputText v-model="form.title" maxlength="50" class="w-full" />
         </div>
         <div class="mb-3 flex gap-2">
           <div class="flex-1">
             <label>开始日期 *</label>
-            <Calendar v-model="form.startDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
+            <Calendar v-model="form.startDate" dateFormat="yy-mm-dd" showIcon class="w-full" />
           </div>
           <div class="flex-1">
             <label>开始时间 *</label>
-            <InputText v-model="form.startTime" placeholder="HH:mm" required class="w-full" />
+            <InputText v-model="form.startTime" placeholder="HH:mm" class="w-full" />
           </div>
         </div>
         <div class="mb-3 flex gap-2">
           <div class="flex-1">
             <label>结束日期 *</label>
-            <Calendar v-model="form.endDate" dateFormat="yy-mm-dd" showIcon required class="w-full" />
+            <Calendar v-model="form.endDate" dateFormat="yy-mm-dd" showIcon class="w-full" />
           </div>
           <div class="flex-1">
             <label>结束时间 *</label>
-            <InputText v-model="form.endTime" placeholder="HH:mm" required class="w-full" />
+            <InputText v-model="form.endTime" placeholder="HH:mm" class="w-full" />
           </div>
         </div>
         <div class="mb-3">
@@ -173,7 +173,7 @@
           <Textarea v-model="form.description" maxlength="500" rows="3" class="w-full" />
         </div>
         <div class="flex justify-end gap-2">
-          <Button label="取消" icon="pi pi-times" severity="secondary" @click="showDialog=false; submitLoading = false" type="button" />
+          <Button label="取消" icon="pi pi-times" severity="secondary" @click="showDialog=false; submitLoading = false" type="button" :disabled="submitLoading"/>
           <Button :label="dialogMode==='create'?'创建':'保存'" icon="pi pi-check" :loading="submitLoading" type="submit" />
         </div>
       </form>
@@ -195,6 +195,7 @@
           label="取消" 
           icon="pi pi-times" 
           @click="showDeleteDialog = false; submitLoading = false" 
+          :disabled="submitLoading"
           text 
         />
         <Button 
@@ -216,7 +217,7 @@
           <InputText v-model="inviteUser" placeholder="输入用户名" class="w-full" />
         </div>
         <div class="flex justify-end gap-2">
-          <Button label="取消" icon="pi pi-times" severity="secondary" @click="showInviteDialog=false; submitLoading=false" />
+          <Button label="取消" icon="pi pi-times" severity="secondary" @click="showInviteDialog=false; submitLoading=false" :disabled="submitLoading"/>
           <Button
             label="邀请"
             icon="pi pi-user-plus"
@@ -358,7 +359,7 @@ function getDefaultDateRange() {
   const today = new Date(now.getTime() + beijingOffset);
   today.setUTCHours(0, 0, 0, 0); // 使用UTC方法
   const endDate = new Date(today);
-  endDate.setUTCDate(today.getUTCDate() + 7); // 7天后
+  endDate.setUTCDate(today.getUTCDate() + 6); // 6天后
   endDate.setUTCHours(23, 59, 59, 999);
   return [
     new Date(today.getTime() - beijingOffset),
@@ -499,7 +500,7 @@ async function onSubmit() {
     toast.add({
       severity: 'warn',
       summary: '警告',
-      detail: '请填写所有必填(*标)字段',
+      detail: '请填写所有必填（*标）字段',
       life: 3000
     });
     return;
@@ -510,12 +511,20 @@ async function onSubmit() {
   const start = `${startDateStr}T${form.value.startTime}:00`;
   const end = `${endDateStr}T${form.value.endTime}:00`;
 
-  const timeFormatRegex = /^([01]?[0-9]|2[0-3])(:([0-5][0-9]))?$/;  // 验证时间格式
-  if (!timeFormatRegex.test(form.value.startTime) || !timeFormatRegex.test(form.value.endTime)) {
+  const timeFormatRegex = /^([01][0-9]|2[0-3])(:[0-5][0-9])?$/;  // 验证时间格式
+  if (!timeFormatRegex.test(form.value.startTime)) {
     toast.add({
       severity: 'warn',
       summary: '警告',
-      detail: '结束时间格式不正确，请使用 HH 或 HH:mm 格式，如 18 或 18:30',
+      detail: '开始时间格式不正确，请使用 HH 或 HH:mm 格式，如 09 或 14:30',
+      life: 3000
+    });
+    return;
+  }else if (!timeFormatRegex.test(form.value.endTime)) {
+    toast.add({
+      severity: 'warn',
+      summary: '警告',
+      detail: '结束时间格式不正确，请使用 HH 或 HH:mm 格式，如 09 或 14:30',
       life: 3000
     });
     return;
@@ -565,7 +574,7 @@ async function onSubmit() {
         toast.add({
           severity: 'success',
           summary: '成功',
-          detail: '日程更新成功',
+          detail: '日程修改成功',
           life: 3000
         });
       }else{
@@ -578,12 +587,7 @@ async function onSubmit() {
       }
     }
   }catch (err) {
-    toast.add({
-      severity: 'error',
-      summary: '错误',
-      detail: `日程${dialogMode.value === 'create' ? '创建' : '更新'}失败`,
-      life: 5000
-    });
+    console.error('日程创建/更新失败:', err)
   }finally {
     submitLoading.value = false; 
     showDialog.value = false;
@@ -598,7 +602,7 @@ async function confirmDelete() {
 
   submitLoading.value = true;
   try {
-    await request.delete(`/schedule/delete/${scheduleToDelete.value.id}`)
+    const res = await request.delete(`/schedule/delete/${scheduleToDelete.value.id}`)
     if(res.data.code === 200){
       schedules.value = schedules.value.filter(s => s.id !== scheduleToDelete.value.id)
       toast.add({
@@ -617,12 +621,6 @@ async function confirmDelete() {
     }
   } catch (err) {
     console.error('删除失败:', err)
-    toast.add({
-      severity: 'error',
-      summary: '删除失败',
-      detail: `删除日程失败: ${err.response?.data?.message || err.message}`,
-      life: 5000
-    })
   } finally {
     showDeleteDialog.value = false;
     scheduleToDelete.value = null;
@@ -644,12 +642,7 @@ async function sendInvite() {
       inviteResult.value = { success: true, message: `已向 ${inviteUser.value} 发送邀请` };
       inviteUser.value = '';
     }else{
-      toast.add({
-        severity: 'error',
-        summary: '错误',
-        detail: res.data.message,
-        life: 3000
-      });
+      inviteResult.value = { success: false, message: '未找到该用户' };
     }
   } catch (e) {
     inviteResult.value = { success: false, message: '未找到该用户' };
