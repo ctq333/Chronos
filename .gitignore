@@ -188,3 +188,6 @@ dist/
 *.sw?
 dist-ssr
 *.local
+
+#sonarqube
+.scannerwork/
