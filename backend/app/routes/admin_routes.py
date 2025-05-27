@@ -107,15 +107,16 @@ def update_user(current_user, user_id):
     
     # 禁止禁用其他管理员账户
     if target_user.is_admin:
+        print(target_user.is_admin)
         return jsonify({
             "code": 403,
             "message": "不能修改其他管理员账户状态"
         }), 200
 
-    if current_user.status == 1:
-        current_user.status = 0
+    if target_user.status == 1:
+        target_user.status = 0
     else:
-        current_user.status = 1
+        target_user.status = 1
 
     try:
         db.session.commit()
@@ -125,7 +126,7 @@ def update_user(current_user, user_id):
 
     return jsonify({
         "code":200,
-        "id": user.id
+        "id": target_user.id
     })
 @bp.route("/users/<int:user_id>/password", methods=["PUT"])
 @login_required(admin_required=True)
