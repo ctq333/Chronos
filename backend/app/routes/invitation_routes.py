@@ -41,6 +41,9 @@ def invitation_accept(user):
         if not invitation:
             return jsonify({"code": 404, "message": "邀请记录不存在"}), 404
         invitation.status = 1
+        schedule = Schedule.query.get(invitation.schedule_id)
+        schedule.user_id = invitation.receiver_id
+        db.session.add(schedule)
         db.session.commit()
         return jsonify({
             "code": 200,
