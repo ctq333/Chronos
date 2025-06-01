@@ -1,76 +1,136 @@
--- 用户账户表
-CREATE TABLE user (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(64) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    status TINYINT DEFAULT 1,
-    email VARCHAR(128) UNIQUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_admin TINYINT DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create table user
+(
+    id               bigint auto_increment
+        primary key,
+    username         varchar(64)                        not null,
+    password_hash    varchar(255)                       not null,
+    status           tinyint  default 1                 null,
+    email            varchar(128)                       null,
+    created_at       datetime default CURRENT_TIMESTAMP null,
+    updated_at       datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    is_admin         tinyint  default 0                 null,
+    token            varchar(255)                       null,
+    token_expires_at datetime                           null,
+    constraint email
+        unique (email),
+    constraint username
+        unique (username)
+);
 
--- 日程表
-CREATE TABLE schedule (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    title VARCHAR(100) NOT NULL,
-    description TEXT,
-    start_time DATETIME NOT NULL,
-    end_time DATETIME NOT NULL,
-    location VARCHAR(255),
-    link VARCHAR(255),
-    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create table monthly_report
+(
+    id         bigint auto_increment
+        primary key,
+    user_id    bigint                             not null,
+    content    text                               null,
+    created_at datetime default CURRENT_TIMESTAMP not null,
+    start_date date                               not null,
+    end_date   date                               not null,
+    constraint monthly_report_ibfk_1
+        foreign key (user_id) references user (id)
+            on delete cascade
+);
 
--- 事项表
-CREATE TABLE task (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    title VARCHAR(100) NOT NULL,
-    plan_date DATE NOT NULL,
-    due_date DATE NOT NULL,
-    priority TINYINT DEFAULT 2,
-    notes VARCHAR(255),
-    progress TINYINT DEFAULT 0,
-    status TINYINT DEFAULT 0,
-    postpone_count INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    tag VARCHAR(255),
-    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create index user_id
+    on monthly_report (user_id);
 
--- 日程邀请表
-CREATE TABLE schedule_invitation (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    schedule_id BIGINT NOT NULL,
-    sender_id BIGINT NOT NULL,
-    receiver_id BIGINT NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status TINYINT NOT NULL DEFAULT 0,
-    FOREIGN KEY (schedule_id) REFERENCES schedule(id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_id) REFERENCES user(id) ON DELETE CASCADE,
-    FOREIGN KEY (receiver_id) REFERENCES user(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create table schedule
+(
+    id          bigint auto_increment
+        primary key,
+    user_id     bigint       not null,
+    title       varchar(100) not null,
+    description text         null,
+    start_time  datetime     not null,
+    end_time    datetime     not null,
+    location    varchar(255) null,
+    link        varchar(255) null,
+    constraint schedule_ibfk_1
+        foreign key (user_id) references user (id)
+            on delete cascade
+);
 
--- 事项子任务表
-CREATE TABLE subtask (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    parent_task_id BIGINT NOT NULL,
-    title VARCHAR(100) NOT NULL,
-    completed TINYINT DEFAULT 0,
-    FOREIGN KEY (parent_task_id) REFERENCES task(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create index user_id
+    on schedule (user_id);
 
--- 周月报告表
-CREATE TABLE report (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    type ENUM('weekly', 'monthly') NOT NULL,
-    content TEXT,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create table schedule_invitation
+(
+    id          bigint auto_increment
+        primary key,
+    schedule_id bigint                             not null,
+    sender_id   bigint                             not null,
+    receiver_id bigint                             not null,
+    created_at  datetime default CURRENT_TIMESTAMP not null,
+    status      tinyint  default 0                 not null comment '0-未处理 1-接收 2-拒绝',
+    constraint schedule_invitation_ibfk_1
+        foreign key (schedule_id) references schedule (id)
+            on delete cascade,
+    constraint schedule_invitation_ibfk_2
+        foreign key (sender_id) references user (id)
+            on delete cascade,
+    constraint schedule_invitation_ibfk_3
+        foreign key (receiver_id) references user (id)
+            on delete cascade
+);
+
+create index receiver_id
+    on schedule_invitation (receiver_id);
+
+create index schedule_id
+    on schedule_invitation (schedule_id);
+
+create index sender_id
+    on schedule_invitation (sender_id);
+
+create table task
+(
+    id             bigint auto_increment
+        primary key,
+    user_id        bigint                             not null,
+    title          varchar(100)                       not null,
+    plan_date      date                               not null,
+    due_date       date                               not null,
+    priority       tinyint  default 2                 null,
+    notes          varchar(255)                       null,
+    progress       tinyint  default 0                 null,
+    status         tinyint  default 0                 null,
+    postpone_count int      default 0                 null,
+    created_at     datetime default CURRENT_TIMESTAMP null,
+    updated_at     datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    tag            varchar(255)                       null,
+    constraint task_ibfk_1
+        foreign key (user_id) references user (id)
+            on delete cascade
+);
+
+create table subtask
+(
+    id             bigint auto_increment
+        primary key,
+    parent_task_id bigint            not null,
+    title          varchar(100)      not null,
+    completed      tinyint default 0 null,
+    constraint subtask_ibfk_1
+        foreign key (parent_task_id) references task (id)
+            on delete cascade
+);
+
+create index parent_task_id
+    on subtask (parent_task_id);
+
+create index user_id
+    on task (user_id);
+
+create table weekly_report
+(
+    id         bigint auto_increment
+        primary key,
+    user_id    bigint                             not null,
+    week       varchar(20)                        not null,
+    content    text                               not null,
+    created_at datetime default CURRENT_TIMESTAMP null,
+    constraint fk_weekly_report_user_id
+        foreign key (user_id) references user (id)
+            on delete cascade
+);
+
