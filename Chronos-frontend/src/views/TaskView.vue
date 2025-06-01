@@ -1060,7 +1060,7 @@ async function onScheduleSubmit() {
       payload,
       { headers: { Authorization: 'Bearer ' + store.state.token } }
     );
-    if (res.data.success) {
+    if (res.data.code === 200) {
       alert('创建日程成功');
       showScheduleDialog.value = false;
       // 可选：你可以直接跳转到日程页面，或者刷新本地schedules
