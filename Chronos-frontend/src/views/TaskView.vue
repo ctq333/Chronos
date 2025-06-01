@@ -143,7 +143,7 @@
                             </div>
                             <div class="flex items-center gap-1">
                                 <Button icon="pi pi-pencil" rounded text class="p-button-sm" @click="openEditDialog(event)" />
-                                <Button icon="pi pi-trash" rounded text severity="danger" class="p-button-sm" :loading="submitLoading" @click="confirmDelete(event)" />
+                                <Button icon="pi pi-trash" rounded text severity="danger" class="p-button-sm" :loading="deletingTaskId === event.id" @click="confirmDelete(event)" />
                                 <!-- 状态切换按钮 -->
                                 <Button
                                     :icon="event.status === 'completed' ? 'pi pi-undo' : 'pi pi-check'"
@@ -404,6 +404,8 @@ const store = useStore()
 const BACKEND_PATH = import.meta.env.VITE_BACKEND_PATH;
 const submitLoading = ref(false)   // 用于“创建/保存/删除”等提交按钮
 const llmLoading = ref(false)      // 用于 LLM 智能生成时的加载状态
+
+const deletingTaskId = ref(null);
 function getPriorityText(priority) {
 	const texts = { 1: '低', 2: '中', 3: '高', 4: '紧急' };
 	return texts[priority] || priority;
@@ -970,7 +972,7 @@ async function confirmLLMSchedules() {
 
 async function confirmDelete(row) {
   if (!confirm(`确定要删除"${row.title}"?`)) return;
-  submitLoading.value = true;
+  deletingTaskId.value = row.id;
   try {
     const res = await axios.delete(`/api/task/${row.id}/delete`, {
       headers: { 'Authorization': 'Bearer ' + store.state.token }
@@ -983,7 +985,7 @@ async function confirmDelete(row) {
   } catch (err) {
     alert('删除失败: ' + (err.response?.data?.message || err.message));
   } finally {
-    submitLoading.value = false;
+    deletingTaskId.value = null; 
   }
 }
 

@@ -423,6 +423,7 @@ async function fetchEvents(date) {
 // 初始化
 onMounted(() => {
   dateRange.value = getDefaultDateRange()
+  fetchEvents(selectedDate.value); 
 })
 
 // 监听日期范围变化
@@ -625,6 +626,7 @@ async function confirmDelete() {
     showDeleteDialog.value = false;
     scheduleToDelete.value = null;
     submitLoading.value = false;
+    fetchEvents(selectedDate.value);
   }
 }
 
