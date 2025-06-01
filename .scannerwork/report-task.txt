@@ -1,6 +1,0 @@
-projectKey=chronos
-serverUrl=https://sonarqube.ctq333.top
-serverVersion=25.2.0.102705
-dashboardUrl=https://sonarqube.ctq333.top/dashboard?id=chronos
-ceTaskId=21e158be-ee75-49cd-a4d6-80f5640b4f72
-ceTaskUrl=https://sonarqube.ctq333.top/api/ce/task?id=21e158be-ee75-49cd-a4d6-80f5640b4f72
